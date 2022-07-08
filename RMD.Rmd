@@ -52,10 +52,10 @@ In the next step we test the approach on several steps. First - we process a sam
 
 ```{r 2_parse_lines}
 # read in one specific file for Mac users 
-dat_temp <- readLines(paste(data_path, data_files[1], sep = ''))
+#dat_temp <- readLines(paste(data_path, data_files[1], sep = ''))
 
 # # read in one specific file for PC users 
-# dat_temp <- readLines(paste(data_path, data_files[1], sep = '/'))
+dat_temp <- readLines(paste(data_path, data_files[1], sep = '/'))
 
 glimpse(dat_temp)
 
@@ -97,22 +97,19 @@ glimpse(dat_temp_df)
 Change to long format. Now each well x time combination has it's separate row, and since we have datafile ID we can link wells to specific individuals - e.g., to link-in sex information. We also rename variable according to convention: categorical variables - `Names_start_with_upper_case`; continuous variables - `all_lower_case`.
 
 ```{r 5_turn_to_long}
-dat_temp_df <-
+dat_temp_df2 <-
   dat_temp_df %>%
   pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
   rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
-         Variable = VARIABLE, Date = date, Well_ID = well_id)
+         variable = VARIABLE)
 
-head(dat_temp_df)
+# head(dat_temp_df2)
+# glimpse(dat_temp_df2)
 ```
 
 We have to add the `Individuals_ID` variable to be able to link locomotion data to sex data. It will serve to link Datafile_ID with respective Individuals_ID - and through it with appropriate well number. The run register contains several variables used to group individuals into several blocks that may share some of the systematic variation.
 
-# ```{r 6_load_run_metadata}
-# run_meta <- read_delim(here('Data', 'run_data', 'ID_metadata.csv'), delim = ';')
-# run_meta %>%
-#   kbl() %>% kable_material(c('striped'))
-# ```
+### Sample data frame
 
 ```{r 7_merge_metadata}
 # run_register <- read_delim(here('Data', 'run_data', 'run_register_pilot2.csv'), delim = ';')
@@ -126,7 +123,7 @@ excel_sheets(path = session_data)
 tab_names <- excel_sheets(path = session_data)
 
 #creating a list of dataframes per tab
-list_all <- lapply(tab_names, function(x) read_excel(path = xldata, sheet = x))
+list_all <- lapply(tab_names, function(x) read_excel(path = session_data, sheet = x))
 
 #assigning tab names to each dataframe
 names(list_all) <- tab_names
@@ -134,10 +131,13 @@ names(list_all) <- tab_names
 #get dataframes out of list
 list2env(list_all, .GlobalEnv)
 
-#TODO need to join all datafrmaes
+#TODO how to join data frames when there is no common by = 
+#Probably best to just join the actual data with individual IDs and treatments etc rather than Run register - need to figure out how to join then with the correct datafile. There is also no column in data_temp2 that has retained assay name. 
+
+#need to add an column called 
 
 
-dat_temp_df <- dat_temp_df %>%
+dat_temp_df3 <- dat_temp_df2 %>%
   left_join(Run_register, by = )
 
 dat_temp_df <- dat_temp_df %>%
@@ -146,4 +146,70 @@ dat_temp_df <- dat_temp_df %>%
 dat_temp_df <- dat_temp_df %>% select(Individuals_ID_well, Individuals_ID, Datafile_ID, Date,
                                       Batch_ID, Exp_block,temperature, round, arena_distance)
 glimpse(dat_temp_df)
+```
+
+### Processing all data frames
+```{r 8_create_data_parser}
+data_compiler <- function(filename, data_path, run_register) {
+  
+  ## ARG filename vector or list of file names to process (only files, no full paths)
+  ## ARG data_path text string with the path to access all files
+  ## ARG run_register database of all runs with datafile IDs and sexing IDs
+  
+  ## ARGS to develop: passing custom RE, custom wells to skip, custom columns to skip
+  
+  dat_temp <- readLines(paste(data_path, filename, sep = ''))
+  
+  # file parsing
+  dat_temp_df <- read.csv(text = dat_temp, header = T, sep = ',',
+                          quote = '\"', dec = '.', skip = 4, nrows = length(dat_temp) - 4 - 2,
+                          stringsAsFactors = F)
+  
+  ## these line are design specific - for now the function has close form on those
+  ## possible to implement as additional argument
+  
+  dat_temp_df <- dat_temp_df[, -(2:6)]
+  dat_temp_df <- dat_temp_df %>% select(!(F6:F8))
+  
+  # extract headers
+  head_temp <- readLines(paste(data_path, filename, sep = ''), n = 4)
+  
+  # using RE - this method is more flexible as the structure and location of ID can change
+  id_index <- grep('.*Subject Identification\\\",\"([A-Z0-9]{7}_B_[0-9]{6}_[0-9]{1,2})\\\"', head_temp)
+  run_id <- gsub('.*Subject Identification\\\",\"([A-Z0-9]{7}_B_[0-9]{6}_[0-9]{1,2})\\\"', '\\1', head_temp[id_index])
+  dat_temp_df$Datafile_ID <- run_id
+  
+  assay_date <- str_sub(run_id, 11, 16)
+  dat_temp_df$date <- assay_date
+  
+  dat_temp_df <-
+  dat_temp_df %>%
+  pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
+  rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
+         Variable = VARIABLE, Date = date, Well_ID = well_id)
+  
+  dat_temp_df <- dat_temp_df %>%
+    left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
+  
+  dat_temp_df <- dat_temp_df %>%
+    mutate(Individuals_ID_well = paste0(Individuals_ID, '_', Well_ID))
+  
+  dat_temp_df$Filename <- filename
+  
+  dat_temp_df <- dat_temp_df %>% select(Individuals_ID_well, Individuals_ID, Datafile_ID, Date, Filename, Exp_block, Batch_ID,
+                                      temperature, round, arena_distance)
+  
+  return(dat_temp_df)
+}
+```
+
+Process the files using the above function, mapping it row-wise into a new data-frame.
+
+```{r 9_parse_data, message = F}
+
+data_locomotion <- map_dfr(data_files, ~ data_compiler(.x, data_path = data_path)) #cannot find the connection
+
+length(unique(data_locomotion$Datafile_ID)) # should be 24 distinct files
+
+glimpse(data_locomotion)
 ```
