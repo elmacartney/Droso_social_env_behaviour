@@ -78,7 +78,7 @@ glimpse(dat_temp_df)
 Here we extract and append the run (subject) ID.
 
 ```{r 4_parse_runID}
-head_temp <- readLines(paste(data_path, data_files[1], sep = ''), n = 4)
+head_temp <- readLines(paste(data_path, data_files[1], sep = '/'), n = 4)
 
 # using RE - this method is more flexible as the structure and location of ID can change
 
@@ -87,7 +87,7 @@ head_temp <- readLines(paste(data_path, data_files[1], sep = ''), n = 4)
 
 id_index <- grep('Subject Identification', head_temp)
 # id_index <- grep('.*Subject Identification\\\",\"([A-Z0-9]{7}_B_[0-9]{6}_[0-9]{1,2})\\\"', head_temp)
-run_id <- gsub('.*Subject Identification\\\",\"([A-Z0-9]{7}_B_[0-9]{6}_[0-9]{1,2})\\\"', '\\1', head_temp[id_index])
+run_id <- gsub('.*Subject Identification\\\",\"([A-Z]{1}[0-9]{3})\\\"', '\\1', head_temp[id_index])
 dat_temp_df$Datafile_ID <- run_id
 
 assay_date <- str_sub(run_id, 11, 16)
@@ -158,7 +158,7 @@ data_compiler <- function(filename, data_path, run_register) {
   
   ## ARGS to develop: passing custom RE, custom wells to skip, custom columns to skip
   
-  dat_temp <- readLines(paste(data_path, filename, sep = ''))
+  dat_temp <- readLines(paste(data_path, filename, sep = '/'))
   
   # file parsing
   dat_temp_df <- read.csv(text = dat_temp, header = T, sep = ',',
@@ -172,7 +172,7 @@ data_compiler <- function(filename, data_path, run_register) {
   dat_temp_df <- dat_temp_df %>% select(!(F6:F8))
   
   # extract headers
-  head_temp <- readLines(paste(data_path, filename, sep = ''), n = 4)
+  head_temp <- readLines(paste(data_path, filename, sep = '/'), n = 4)
   
   # using RE - this method is more flexible as the structure and location of ID can change
   id_index <- grep('.*Subject Identification\\\",\"([A-Z0-9]{7}_B_[0-9]{6}_[0-9]{1,2})\\\"', head_temp)
