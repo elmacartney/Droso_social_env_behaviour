@@ -338,6 +338,7 @@ dat_an3 <- dat_an3 %>%
 dat_an4 <- na.omit(dat_an3)
 dat_an4
 ```
+
 #### Startle response
 
 ```{r 38_load_data}
@@ -369,3 +370,58 @@ for (i in new_list){
 }
 ```
 
+```{r 39_select_variables}
+df <- df %>% select(!c(RUNTIME, UNIT, TIMESLOT, TEMPERATURE))
+#convert variables to factors for anova
+df<-as_factor(df,BLOCK)
+df<-as_factor(df,TYPE)
+
+df <- df %>% rename(Datafile_ID = PLATE_ID, time_bin = TIME_BIN,
+                    Block = BLOCK, Trial = TRIAL, Type = TYPE,
+                    pre_post_counter = PRE_POST_COUNTER,
+                    startle_number = STARTLE_NUMBER)
+
+df <- df %>% select(-c(F6:F8), -c(F6MSD:F8MSD))
+```
+
+```{r 41_MSD_process_etal}
+dfile_dist <- df %>% 
+  select(!ends_with("MSD")) %>%
+  gather(key = "Well", value = "distance", -Datafile_ID,
+         -time_bin, -Block, -Trial, -Type, -pre_post_counter,
+         -startle_number) %>%
+  convert_as_factor(Well)
+
+# create file with well factor and MSD activity dv only
+dfile_act<- df %>%
+  select(ends_with("MSD")) %>%
+  gather(key = "Well", value = "activity") %>%
+  convert_as_factor(Well)
+
+# remove duplicate well variable before adding activity data
+dfile_act <- select(dfile_act, -'Well')
+
+# add activity column to rest of data
+df <- add_column(dfile_dist, dfile_act)
+
+# remove acclimation data
+no_acclimation <- df %>%
+  filter(Type != "ACCLIMATION")
+
+# create data file with only startles from first repeat (Block == 1)
+startles_only <- filter(no_acclimation, Type == "STARTLE", Block == 1)
+# pop_startles_only<-filter(pop_data, Type == "STARTLE", Block == 1)
+```
+
+Merging with sex (and other data) [in progress, not running yet --> see issue]
+
+```{r 41_merge_with_sex_data}
+startles_only <- startles_only %>%
+    left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
+
+startles_only <- startles_only %>%
+  mutate(Individuals_ID_well = paste0(Individuals_ID, "_", Well))
+
+startles_only <- startles_only %>%
+  left_join(sex, by = "Individuals_ID_well")
+```
