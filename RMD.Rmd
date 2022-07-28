@@ -140,6 +140,7 @@ data_files[1:72]
 
 The below parser identifies lines in the dataset that directly relate to zone-switching data and extracts them, or (when `summary = TRUE`) it extracts the arena distances summaries from the bottom section of the file.
 
+*[EDIT] apparently read_delim no longer works with just vectors, now needs `I()`*
 ```{r 18_create_parser}
 # helper functions extracting the data rows and the header rows
 data_parser <- function(pattern, path, filename, summary = FALSE) {
@@ -147,11 +148,11 @@ data_parser <- function(pattern, path, filename, summary = FALSE) {
   zone_change_index <- grep(pattern, dat_temp)
   
   if(summary == FALSE) {
-    return(read_delim(file = dat_temp[zone_change_index], col_names = F, delim = ',',
+    return(read_delim(file = I(dat_temp[zone_change_index]), col_names = F, delim = ',',
                       quote = '\"' # skip = 4, nrows = length(dat_temp) - 4 - 1)
     ))
   } else {
-    return(read_delim(file = dat_temp[-zone_change_index], col_names = T, delim = ',',
+    return(read_delim(file = I(dat_temp[-zone_change_index]), col_names = T, delim = ',',
                       quote = '\"', skip = 6, n_max = 3))
   }
 }
@@ -163,22 +164,180 @@ test1 <- readLines(paste(data_path, data_files[1], sep = '/'))
 id_test <- grep(pattern1, test1) # use (simplified) RE to select lines
 ```
 
-
+*[EDIT] apparently read_delim no longer works with just vectors, now needs `I()`*
 ```{r 19_test_data}
 # this extracts (messy) run and temporary data from each file
-test_dat <- read_delim(file = test1[-id_test], col_names = T, delim = ',',
+test_dat <- read_delim(file = I(test1[-id_test]), col_names = T, delim = ',',
                       quote = '\"', skip = 6, n_max = 3)
 
 # helper function that parses the (messy) run data into a readable format)
 head_parser <- function(path, filename) {
   dat_temp <- readLines(paste(path, filename, sep = ''), n = 4)
-  return(read_delim(file = dat_temp,
+  return(read_delim(file = I(dat_temp),
                     delim = ',',
                     col_names = F))
 }
 ```
 
 
+```{r 20_parse_data_into_tibbles}
+# create tibble with raw data (nested: data and header nested under file names)
+dat_raw <- tibble(data_files = data_files) %>%
+  mutate(data = map(data_files, 
+                    ~ data_parser(pattern1,
+                                  data_path,
+                                  .x, summary = FALSE))) %>%
+  mutate(head = map(data_files, ~ head_parser(data_path, .x)))
+
+# this removes the redundant 'Arena' column
+dat_raw[[2]] <- dat_raw[[2]] %>%
+  map(~ select(.x, !c(X3)))
+
+# rename variables in sub-tibble based on their real content
+dat_raw[[2]] <- dat_raw[[2]] %>%
+  map(~ rename(.x, time = X1, Info = X2, Arena = X4, Action = X5, Zone_no = X6))
+
+# reformat the head sub-tibble
+dat_raw[[3]] <- dat_raw[[3]] %>%
+  map(~ pivot_wider(.x, names_from = X3, values_from = X4)) %>%
+  map(~ rename(.x, Datafile_ID = `Subject Identification`)) %>%
+  map(~ select(.x, Apparatus, Datafile_ID))
+
+# check the modifications
+dat_raw[[2]][[1]]
+dat_raw[[3]][[1]]
+```
+
+
+```{r 21_process_summaries}
+# parse summary data from a file into a separate tibble - this is not used for now
+# processed only for consistency
+dat_raw_summ <- tibble(data_files = data_files) %>%
+  mutate(data = map(data_files, ~ data_parser(pattern1,
+                                data_path,
+                                .x,
+                                summary = T)))
+dat_raw_summ[[2]] <- dat_raw_summ[[2]] %>%
+  map(~ select(.x, !c(...1, ...2, ...3))) %>%
+  map(~ rename(.x, Summary_stat = ...4))
+dat_raw_summ[[2]][[1]]
+```
+
+```{r 13_unnest}
+
+dat_un <- dat_raw %>%
+  unnest(head) %>%
+  unnest(data)
+
+dat_un <- dat_un %>%
+  select(data_files, Datafile_ID, time, Arena, Action, Zone_no) %>%
+  rename(Data_file = data_files)
+
+```
+
+```{r 24_turn_towide}
+dat_un <- dat_un %>%
+  mutate(Row_ID = row_number()) %>%
+  pivot_wider(names_from = Action, values_from = Zone_no) %>%
+  rename(Exit_zone = Exit_Zone, Enter_zone = Enter_Zone)
+dat_un
+```
+
+```{r 25_create_time_bins}
+dat_an <- dat_un
+dat_an <- dat_an %>%
+  mutate(Bin = ifelse(time > 600 & time < 1200, 1,
+                      ifelse(time > 1200 & time < 1800, 2,
+                             ifelse(time > 1800 & time < 2500, 3, NA))))
+
+dat_an <- dat_an %>%
+  arrange(Data_file, Datafile_ID, Arena, time, Exit_zone)
+dat_an
+```
+
+```{r 26_error_check_create_exit_entry_instances}
+dat_an <- dat_an %>%
+  mutate(Zone = ifelse(Enter_zone == lead(Exit_zone), Enter_zone, 666)) %>%
+  mutate(t_enter = ifelse(Enter_zone >= 1, time, 666)) %>%
+  mutate(t_exit = ifelse(Exit_zone >= 1, time, 666))
+
+dat_an %>% filter(Zone == 666)
+dat_an %>% filter(t_enter == 666)
+dat_an %>% filter(t_exit == 666)
+
+# ALL GOOD! Note - this step is very important and serves to test if data points were sorted correctly
+# Single detected mistakes are likely final entries that failed to exit before assay end
+
+
+# Let's filter out the non-conforming cases and re-confirm the rest is ordered correctly
+# This stage is critical: dplyr filter() function is terribly unintuitive - with the logical
+# condition "NOT" (!) it also drops NA values - thus we have to ensure with replace_na() they are kept
+# to preserve the ordering of enter-exit events
+
+dat_an <- dat_an %>% filter((Zone != 666) %>% replace_na(TRUE))
+dat_an <- dat_an %>%
+  arrange(Data_file, Datafile_ID, Arena, time, Exit_zone)
+dat_an <- dat_an %>%
+  mutate(Zone = ifelse(Enter_zone == lead(Exit_zone), Enter_zone, 666)) %>%
+  mutate(t_enter = ifelse(Enter_zone >= 1, time, 666)) %>%
+  mutate(t_exit = ifelse(Exit_zone >= 1, time, 666))
+dat_an %>% filter(Zone == 666)
+# repeat above 4 steps until last line of code returns empty tibble
+```
+
+```{r 27_calculate_zone_times}
+dat_an <- dat_an %>%
+  # filter(is.na(Zone)) %>% # this filter is just for testing purposes (it removes the 'Exit_zone' portion of data)
+  select(Data_file, Datafile_ID, time, Arena, Row_ID, Bin, Zone, t_enter, t_exit)
+dat_an <- dat_an %>%
+  mutate(t_exit = lead(t_exit))
+dat_an <- na.omit(dat_an)
+dat_an <- dat_an %>%
+  mutate(t_zone = t_exit - t_enter)
+dat_an
+```
+
+```{r 28_remove_central_zone}
+dat_an2 <- dat_an %>% filter(Zone != 4)
+dat_an2
+```
+
+Movement analysis [in progress, not running yet --> see issues]
+
+```{r 29_add_meta_make_trigrams}
+well_arena <- read_delim(here('Data', 'run_data', 'well_arena_corresp.csv'), delim = ';')
+
+dat_an2 <- dat_an2 %>%
+  left_join(select(run_register, Datafile_ID, Individuals_ID, Plate, Unit_ID), by = "Datafile_ID") %>%
+  mutate(Ymaze_arena = paste0(Plate, "_", Arena)) %>%
+  # mutate(fly_id = paste(gsub('[A-Za-z0-9]+\\/([A-Za-z0-9_-]+)\\.csv', '\\1', data_files), arena, sep = "_"))
+  # mutate(fly_id = paste0(Datafile_ID, "_", Ymaze_arena)) %>% # not really necessary
+  left_join(select(well_arena, Ymaze_arena, Plate48well), by = "Ymaze_arena") %>%
+  mutate(Individuals_ID_well = paste0(Individuals_ID, "_", Plate48well)) %>%
+  select(Datafile_ID, Individuals_ID, Individuals_ID_well, Ymaze_arena, time, Bin, Zone, t_zone)
+
+# split datafile into individual flies
+dat_an2 <- dat_an2 %>% split(., .[, "Individuals_ID_well"])
+
+dat_an2 <- dat_an2 %>%
+  map(~ mutate(.x, Lag_zone = lag(Zone))) %>%
+  map(~ mutate(.x, Turn = case_when(Lag_zone==1 & Zone==2 ~ 'L',
+                                  Lag_zone==1 & Zone==3 ~ 'R',
+                                  Lag_zone==2 & Zone==1 ~ 'R',
+                                  Lag_zone==2 & Zone==3 ~ 'L',
+                                  Lag_zone==3 & Zone==1 ~ 'L',
+                                  Lag_zone==3 & Zone==2 ~ 'R',
+                                  # lag_zone==zone ~ 'X', # this enables additional decision type = stay in the given zone
+                                  TRUE ~ NA_character_ ))) %>%
+  map(~ select(.x, Datafile_ID, Individuals_ID, Individuals_ID_well, Ymaze_arena, time, Bin, Zone, t_zone, Turn))
+
+dat_an3 <- bind_rows(dat_an2)
+dat_an3 <- dat_an3 %>%
+  arrange(Datafile_ID, Individuals_ID_well, Bin)
+
+dat_an4 <- na.omit(dat_an3)
+dat_an4
+```
 #### Startle response
 
 ```{r 38_load_data}
