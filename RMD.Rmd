@@ -37,8 +37,6 @@ Loading session data with treatments and sex etc
 Session_data <- read_excel(here("Data/session_data/Session_data_extended.xlsx"))
 ```
 
-### Sample dataframes
-
 #### Locomotion
 
 First let's test-load one data file to see how to trim it into relevant bits. Definition in this files is so that first 4 rows and first 6 columns are redundant.
@@ -127,6 +125,74 @@ dat_temp_df3 <- dat_temp_df2 %>%
 
 ```
 
+Writing a function that combines all the data processing above
+```{r}
+data_compiler <- function(filename, data_path, session_data) {
+  
+  ## ARG filename vector or list of file names to process (only files, no full paths)
+  ## ARG data_path text string with the path to access all files
+  ## ARG run_register database of all runs with datafile IDs and sexing IDs
+  
+  ## ARGS to develop: passing custom RE, custom wells to skip, custom columns to skip
+  
+  dat_temp <- readLines(paste(data_path, filename, sep = '/'))
+  
+  # file parsing
+  dat_temp_df <- read.csv(text = dat_temp, header = T, sep = ',',
+                          quote = '\"', dec = '.', skip = 4, nrows = length(dat_temp) - 4 - 2,
+                          stringsAsFactors = F)
+  
+  ## these line are design specific - for now the function has close form on those
+  ## possible to implement as additional argument
+  
+  dat_temp_df <- dat_temp_df[, -(2:6)]
+  dat_temp_df <- dat_temp_df %>% select(!(F3:F8))
+  
+  # extract headers
+  head_temp <- readLines(paste(data_path, filename, sep = '/'), n = 4)
+  
+  # using RE - this method is more flexible as the structure and location of ID can change
+id_index <- grep('Subject Identification', head_temp)
+
+run_id <- gsub('.*Subject Identification\\\",\"([A-Z]{1}[0-9]{3})\\\"', '\\1', head_temp[id_index])
+
+  dat_temp_df$Datafile_ID <- run_id
+  
+  assay_date <- str_sub(run_id, 11, 16)
+  dat_temp_df$date <- assay_date
+  
+  dat_temp_df <-
+  dat_temp_df %>%
+  pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
+  rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
+         Variable = VARIABLE, Date = date, Well_ID = well_id)
+  
+  dat_temp_df <- dat_temp_df %>%
+    left_join(Session_data, by = "Individual_ID")
+  
+  dat_temp_df <- dat_temp_df %>%
+    mutate(Individual_ID = paste(dat_temp_df$Datafile_ID, dat_temp_df$well_id, sep = "_"))
+  
+  dat_temp_df$Filename <- filename
+  
+  dat_temp_df <- dat_temp_df %>% select(Individual_ID, Individuals_ID, Datafile_ID, Date, Filename, Exp_block, Batch_ID,
+                                      temperature, round, arena_distance)
+  
+  return(dat_temp_df)
+}
+```
+
+Process the files using the above function, mapping it row-wise into a new data-frame.
+
+```{r 9_parse_data, message = F}
+# Not run: test
+# data_compiler(data_files[1], data_path, Session_data
+
+data_locomotion <- map_dfr(data_files, ~ data_compiler(.x, data_path = data_path, session_data = Session_data)) #TODO how do I tell it to read the session_data file?? Session_data is already read in above
+
+length(unique(data_locomotion$Datafile_ID))
+glimpse(data_locomotion)
+```
 
 
 #### Ymaze
@@ -174,7 +240,7 @@ test_dat <- read_delim(file = I(test1[-id_test]), col_names = T, delim = ',',
 
 # helper function that parses the (messy) run data into a readable format)
 head_parser <- function(path, filename) {
-  dat_temp <- readLines(paste(path, filename, sep = ''), n = 4)
+  dat_temp <- readLines(paste(path, filename, sep = '/'), n = 4)
   return(read_delim(file = I(dat_temp),
                     delim = ',',
                     col_names = F))
@@ -345,6 +411,8 @@ dat_an4
 
 ```{r 38_load_data}
 #specify directory of zantiks habituation files
+data_path <- here("data", "habituation", sep = '/') 
+
 data_path <- here("data", "habituation/") 
 
 #create list of files from directory
