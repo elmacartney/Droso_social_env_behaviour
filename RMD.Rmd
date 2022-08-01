@@ -125,6 +125,7 @@ dat_temp_df3 <- dat_temp_df2 %>%
 
 ```
 
+
 ```{r}
 files <- list.files(data_path)
 
@@ -386,16 +387,14 @@ dat_an4
 
 ```{r 38_load_data}
 #specify directory of zantiks habituation files
-data_path <- here("data", "habituation", sep = '/') 
-
-data_path <- here("data", "habituation/") 
+data_path <- here("Data/habituation/") 
 
 #create list of files from directory
 file_list <- list.files(data_path)
 
 #create header from first file
 df <-
-  paste0(data_path, file_list[1]) %>%
+  paste(data_path, file_list[1],sep = '/') %>%
   read_csv(skip=4,col_names = TRUE, guess_max = 100) %>%
   head(0)
 
@@ -404,7 +403,7 @@ new_list<- c()
 
 for (i in file_list){
   new_list[[i]] <-
-    read_csv(paste0(data_path, i),
+    read_csv(paste(data_path, i, sep = '/'),
              skip=4, col_names = TRUE, guess_max = 100) %>%
     head(-1)
 }
