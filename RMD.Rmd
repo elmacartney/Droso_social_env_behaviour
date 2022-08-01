@@ -93,7 +93,7 @@ dat_temp_df$Datafile_ID <- run_id
 glimpse(dat_temp_df)
 ```
 
-Change to long format. .
+Change to long format.
 
 ```{r 5_turn_to_long}
 dat_temp_df2 <-
@@ -103,7 +103,7 @@ dat_temp_df2 <-
          variable = VARIABLE)
 
 # head(dat_temp_df2)
-# glimpse(dat_temp_df2)
+glimpse(dat_temp_df2)
 ```
 
 We have to add the `Individuals_ID` variable to be able to link locomotion data to sex data. It will serve to link Datafile_ID with respective Individuals_ID - and through it with appropriate well number. The run register contains several variables used to group individuals into several blocks that may share some of the systematic variation.
@@ -122,6 +122,7 @@ dat_temp_df2$Individual_ID <- paste(dat_temp_df2$Datafile_ID, dat_temp_df2$well_
 
 dat_temp_df3 <- dat_temp_df2 %>%
   left_join(Session_data, by = "Individual_ID")
+glimpse(dat_temp_df3)
 
 ```
 
