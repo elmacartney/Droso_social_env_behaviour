@@ -37,8 +37,6 @@ Loading session data with treatments and sex etc
 Session_data <- read_excel(here("Data/session_data/Session_data_extended.xlsx"))
 ```
 
-### Sample dataframes
-
 #### Locomotion
 
 First let's test-load one data file to see how to trim it into relevant bits. Definition in this files is so that first 4 rows and first 6 columns are redundant.
@@ -128,6 +126,50 @@ dat_temp_df3 <- dat_temp_df2 %>%
 ```
 
 
+```{r}
+files <- list.files(data_path)
+
+locomotion_full <- NULL
+
+for(i in 1:length(files)){
+  temp <- read.csv(text = dat_temp, 
+                   header = T, 
+                   sep = ',',
+                   quote = '\"', 
+                   dec = '.', 
+                   skip = 4, 
+                   nrows = length(dat_temp) - 4 - 2,
+                   stringsAsFactors = F)
+  
+  # data wrangling here
+  dat_temp_df <- temp[, -(2:6)] # remove spurious columns
+  dat_temp_df <- dat_temp_df %>% select(!(F3:F8))
+  head_temp <- readLines(paste(data_path, data_files[1], sep = '/'), n = 4)
+
+id_index <- grep('Subject Identification', head_temp)
+
+run_id <- gsub('.*Subject Identification\\\",\"([A-Z]{1}[0-9]{3})\\\"', '\\1', head_temp[id_index])
+dat_temp_df$Datafile_ID <- run_id
+dat_temp_df2 <-
+  dat_temp_df %>%
+  pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
+  rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
+         variable = VARIABLE)
+  
+  locomotion_full <- bind_rows(locomotion_full, dat_temp_df2)
+}
+
+Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
+
+#data_temp
+locomotion_full$Individual_ID <- paste(locomotion_full$Datafile_ID, locomotion_full$well_id, sep = "_")
+
+
+locomotion_full  <- locomotion_full %>%
+  left_join(Session_data, by = "Individual_ID")
+
+#left_join after
+```
 
 #### Ymaze
 
@@ -174,7 +216,7 @@ test_dat <- read_delim(file = I(test1[-id_test]), col_names = T, delim = ',',
 
 # helper function that parses the (messy) run data into a readable format)
 head_parser <- function(path, filename) {
-  dat_temp <- readLines(paste(path, filename, sep = ''), n = 4)
+  dat_temp <- readLines(paste(path, filename, sep = '/'), n = 4)
   return(read_delim(file = I(dat_temp),
                     delim = ',',
                     col_names = F))
@@ -345,14 +387,14 @@ dat_an4
 
 ```{r 38_load_data}
 #specify directory of zantiks habituation files
-data_path <- here("data", "habituation/") 
+data_path <- here("Data/habituation/") 
 
 #create list of files from directory
 file_list <- list.files(data_path)
 
 #create header from first file
 df <-
-  paste0(data_path, file_list[1]) %>%
+  paste(data_path, file_list[1],sep = '/') %>%
   read_csv(skip=4,col_names = TRUE, guess_max = 100) %>%
   head(0)
 
@@ -361,7 +403,7 @@ new_list<- c()
 
 for (i in file_list){
   new_list[[i]] <-
-    read_csv(paste0(data_path, i),
+    read_csv(paste(data_path, i, sep = '/'),
              skip=4, col_names = TRUE, guess_max = 100) %>%
     head(-1)
 }
