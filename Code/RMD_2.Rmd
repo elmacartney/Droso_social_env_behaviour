@@ -1,0 +1,220 @@
+---
+title: "Dmel Social Environment on Behaviour"
+author: "Erin Macartney"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::robobook:
+      code_folding: show
+      toc_depth: 3
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = F}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(here) # write out the path
+library(kableExtra)
+library(sjlabelled)
+library(ggpubr)
+library(rstatix)
+library(car)
+library(RColorBrewer)
+library(readxl)
+```
+
+## Data parsing
+Loading session data with treatments and sex etc
+
+```{r 1_data_load}
+#Loading in session data
+Session_data <- read_excel(here("Data/session_data/Session_data_extended.xlsx"))
+```
+
+### Locomotion
+
+```{r 2_data_load}
+data_path <- here("Data/locomotion/")
+data_files <- list.files(here("Data/locomotion/"), recursive = T)
+
+#This loads all 24 files but we will only parse one data file for now
+data_files[1:24]
+```
+
+```{r new_data_compiler}
+data_compiler <- function(filename, data_path) {
+  
+  ## ARG filename vector or list of file names to process (only files, no full paths)
+  ## ARG data_path text string with the path to access all files
+  ## ARG run_register database of all runs with datafile IDs and sexing IDs
+  
+  ## ARGS to develop: passing custom RE, custom wells to skip, custom columns to skip
+  
+  dat_temp <- readLines(paste(data_path, filename, sep = '/'))
+  
+  # file parsing
+  dat_temp_df <- read.csv(text = dat_temp, header = T, sep = ',',
+                          quote = '\"', dec = '.', skip = 4, nrows = length(dat_temp) - 4 - 2,
+                          stringsAsFactors = F)
+  
+  ## these line are design specific - for now the function has close form on those
+  ## possible to implement as additional argument
+  
+  dat_temp_df <- dat_temp_df[, -(2:6)]
+  dat_temp_df <- dat_temp_df %>% select(!(F3:F8))
+  
+  # extract headers
+  head_temp <- readLines(paste(data_path, filename, sep = '/'), n = 4)
+  
+  # using RE - this method is more flexible as the structure and location of ID can change
+  id_index <- grep('Subject Identification', head_temp)
+  run_id <- gsub('.*Subject Identification\\\",\"([A-Z]{1}[0-9]{3})\\\"', '\\1', head_temp[id_index])
+  dat_temp_df$Datafile_ID <- run_id
+  
+  # assay_date <- str_sub(run_id, 11, 16)
+  # dat_temp_df$date <- assay_date
+  
+  dat_temp_df <-
+  dat_temp_df %>%
+  pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
+  rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
+         variable = VARIABLE)
+  
+  dat_temp_df$Individual_ID <- paste(dat_temp_df$Datafile_ID, dat_temp_df$well_id, sep = "_")
+  
+  # dat_temp_df <- dat_temp_df %>%
+  #   left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
+  # 
+  # dat_temp_df <- dat_temp_df %>%
+  #   mutate(Individuals_ID_well = paste0(Individuals_ID, '_', Well_ID))
+  # 
+  # dat_temp_df$Filename <- filename
+  
+  dat_temp_df <- dat_temp_df %>% select(Individual_ID, Datafile_ID,
+                                      temperature, round, arena_distance)
+
+  return(dat_temp_df)
+}
+```
+
+
+```{r 9_parse_data, message = F}
+# Not run: test
+# data_compiler(data_files[1], data_path, run_register)
+
+data_locomotion <- map_dfr(data_files, ~ data_compiler(.x, data_path = data_path))
+
+length(unique(data_locomotion$Datafile_ID)) # should be 8 distinct files
+
+glimpse(data_locomotion)
+```
+
+```{r merge_alrge_data_with_session_data}
+Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
+
+# data_locomotion$Individual_ID <- paste(data_locomotion$Datafile_ID, data_locomotion$well_id, sep = "_")
+
+
+data_locomotion  <- data_locomotion%>%
+  left_join(Session_data, by = "Individual_ID")
+
+
+write.csv(data_locomotion, "data_locomotion")
+```
+
+
+```{r 3_forloop}
+# files <- list.files(data_path)
+# locomotion_full <- NULL
+# for(i in 1:length(files)){
+#   temp <- read.csv(text = dat_temp, 
+#                    header = T, 
+#                    sep = ',',
+#                    quote = '\"', 
+#                    dec = '.', 
+#                    skip = 4, 
+#                    nrows = length(dat_temp) - 4 - 2,
+#                    stringsAsFactors = F)
+#   dat_temp_df <- temp[,-(2:6)] # remove spurious columns
+#   head_temp <-
+#     readLines(paste(data_path, data_files[1], sep = '/'), n = 4)
+#   id_index <- grep('Subject Identification', head_temp)
+#   run_id <-
+#     gsub('.*Subject Identification\\\",\"([A-Z]{1}[0-9]{3})\\\"',
+#          '\\1',
+#          head_temp[id_index])
+#   dat_temp_df$Datafile_ID <- run_id
+#   dat_temp_df2 <-
+#     dat_temp_df %>%
+#     pivot_longer(
+#       names_to = 'well_id',
+#       values_to = 'arena_distance',
+#       cols = matches('[A-H][1-9]')
+#     ) %>%
+#     rename(
+#       time = TIME,
+#       temperature = TEMPERATURE,
+#       round = ROUND,
+#       variable = VARIABLE
+#     )
+#   locomotion_full <- bind_rows(locomotion_full, dat_temp_df2)
+# }
+```
+
+```{r 4_joining session data}
+# Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
+# 
+# locomotion_full$Individual_ID <- paste(locomotion_full$Datafile_ID, locomotion_full$well_id, sep = "_")
+# 
+# 
+# locomotion_full  <- locomotion_full %>%
+#   left_join(Session_data, by = "Individual_ID")
+```
+
+## Visualisations 
+
+### Locomotion 
+
+```{r removing individuals}
+
+data_locomotion$Exclude_mean <- as.factor(data_locomotion$Exclude_mean)
+
+data_locomotion_reduced <- droplevels(data_locomotion[!data_locomotion$Exclude_mean == 'exclude',])
+
+```
+
+```{r locomotion}
+data_locomotion_avg <-data_locomotion_reduced %>%
+  group_by(Individual_ID) %>%
+  summarise(avg = mean(arena_distance))
+
+# raw data variation
+plot1.1 <- data_locomotion_avg %>%
+  ggplot(aes(x = avg)) +
+  geom_histogram() +
+  theme_classic() + theme(text = element_text(size = 15)) +
+  xlab("Mean arena distance")
+plot1.1
+# log scale
+plot1.2 <- data_locomotion_avg %>%
+  ggplot(aes(x = log(avg+1))) +
+  geom_histogram() +
+  theme_classic() + theme(text = element_text(size = 15)) +
+  xlab("log(Mean arena distance)") +
+  ylab("Count")
+plot1.2
+
+plot1.3 <- data_locomotion_reduced %>%
+  ggplot(aes(x = Individual_ID, y = log(arena_distance+1))) +
+  geom_boxplot(width = 0, outlier.size = 0.7) +
+  theme_classic() + theme(axis.text.x = element_blank()) +
+  ylab("Arena distance") + xlab("Individuals")
+plot1.3
+```
+
+

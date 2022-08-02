@@ -202,7 +202,6 @@ glimpse(data_locomotion)
 ```
 
 
-
 #### Ymaze
 
 First we load the y-maze data and tidy it up to separate summary data from zone changes data.
