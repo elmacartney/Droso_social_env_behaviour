@@ -554,13 +554,34 @@ startles_only <- filter(no_acclimation, Type == "STARTLE", Block == 1)
 
 
 
-```{r 41_merge_with_sex_data}
-startles_only <- startles_only %>%
-    left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
+```{r 41_merge_with_session_data_startles}
+# startles_only <- startles_only %>%
+#     left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
 
 startles_only <- startles_only %>%
-  mutate(Individuals_ID_well = paste0(Individuals_ID, "_", Well))
+  mutate(Individual_ID = paste0(Datafile_ID, "_", Well))
 
 startles_only <- startles_only %>%
-  left_join(sex, by = "Individuals_ID_well")
+  left_join(Session_data, by = "Individual_ID")
+```
+
+
+```{r 43_overall_summary}
+startles_only <- startles_only %>%
+  group_by(Individual_ID)
+
+startles_only_act <- startles_only %>%
+  filter(sum(distance) != 0) %>%
+  ungroup()
+
+overall_summary_act <- startles_only_act %>%
+  group_by(startle_number) %>%
+  get_summary_stats(distance, type = "mean_sd")
+
+overall_summary <- startles_only %>%
+  group_by(startle_number) %>%
+  get_summary_stats(distance, type = "mean_sd")
+
+write.table(startles_only, file = "./data/data_startle.csv", sep = ",", row.names = F)
+write.table(startles_only_act, file = "./data/data_startle_act.csv", sep = ",", row.names = F)
 ```
