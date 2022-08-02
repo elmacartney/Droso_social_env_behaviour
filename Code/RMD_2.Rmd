@@ -180,6 +180,7 @@ write.csv(data_locomotion, "data_locomotion")
 
 ### Locomotion 
 
+Removing the individuals that got mixed up/went missing etc
 ```{r removing individuals}
 
 data_locomotion$Exclude_mean <- as.factor(data_locomotion$Exclude_mean)
@@ -188,7 +189,8 @@ data_locomotion_reduced <- droplevels(data_locomotion[!data_locomotion$Exclude_m
 
 ```
 
-```{r locomotion}
+Plotting average locomotion and individual differences
+```{r locomotion average effects}
 data_locomotion_avg <-data_locomotion_reduced %>%
   group_by(Individual_ID) %>%
   summarise(avg = mean(arena_distance))
@@ -217,4 +219,30 @@ plot1.3 <- data_locomotion_reduced %>%
 plot1.3
 ```
 
+Plotting treatment and sex effectd
 
+```{r locomotion treatment and sex effects}
+
+data_locomotion_reduced<-subset(data_locomotion_reduced, select = -Comment)
+data_locomotion_reduced$Treatment<-as.factor(data_locomotion_reduced$Treatment)
+data_locomotion_reduced$Sex<-as.factor(data_locomotion_reduced$Sex)
+
+plot1.4 <- na.omit(data_locomotion_reduced) %>% 
+  ggplot(aes(x = Treatment, y = log(arena_distance+1), fill = Sex)) + 
+  geom_violin(position = position_dodge(1)) + stat_summary(fun= mean, geom = "point", position = position_dodge(1)) + labs(x = "Treatment", y = "log(Arena distance)")
+
+plot1.4
+
+```
+
+## Mean models
+
+```{r locomotion mean effect}
+
+m <- lmer(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch), dat = data_locomotion_reduced)
+
+summary(m)
+#males for active than females, no effect of treatment
+
+qplot(residuals(m)) + theme_classic()
+```
