@@ -567,6 +567,7 @@ startles_only <- startles_only %>%
 
 
 ```{r 43_overall_summary}
+
 startles_only <- startles_only %>%
   group_by(Individual_ID)
 
@@ -582,6 +583,14 @@ overall_summary <- startles_only %>%
   group_by(startle_number) %>%
   get_summary_stats(distance, type = "mean_sd")
 
+binary_summary <- startles_only %>%
+  group_by(Individual_ID) %>%
+  summarise(startle_binary = ifelse(sum(distance) != 0, 1, 0))
+
+startle_binary <- binary_summary %>%
+  left_join(Session_data, by = 'Individual_ID')
+  
 write.table(startles_only, file = "./data/data_startle.csv", sep = ",", row.names = F)
 write.table(startles_only_act, file = "./data/data_startle_act.csv", sep = ",", row.names = F)
+write.table(startle_binary, file = "./data/data_startle_binary.csv", sep = ",", row.names = F)
 ```
