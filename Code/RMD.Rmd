@@ -206,7 +206,7 @@ glimpse(data_locomotion)
 
 First we load the y-maze data and tidy it up to separate summary data from zone changes data.
 
-```{r 17_load_data}
+```{r 17_load_data, eval = FA}
 ## parse datafiles into a nested tibble
 data_path <- here('Data/ymaze/')
 data_files <- list.files(here('Data/ymaze/'), recursive = T)
