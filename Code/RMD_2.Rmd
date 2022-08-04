@@ -26,6 +26,7 @@ library(rstatix)
 library(car)
 library(RColorBrewer)
 library(readxl)
+library(patchwork)
 ```
 
 ## Loading data
@@ -573,12 +574,17 @@ write.table(startle_binary, file = "./data/data_startle_binary.csv", sep = ",", 
 
 ## Assays assessed separately
 
-Removing the individuals that got mixed up/went missing etc
+Removing the individuals that got mixed up/went missing etc for the 'mean' response analysis
 ```{r removing individuals, eval = FALSE}
 
 data_locomotion$Exclude_mean <- as.factor(data_locomotion$Exclude_mean)
 
 data_locomotion_reduced <- droplevels(data_locomotion[!data_locomotion$Exclude_mean == 'exclude',])
+
+data_ymaze_reduced <- droplevels(data_ymaze[!data_ymaze$Exclude_mean == 'exclude',])
+
+data_startle_act_reduced <- droplevels(data_startle_act[!data_startle_act$Exclude_mean == 'exclude',])
+
 
 ```
 
@@ -616,7 +622,7 @@ plot1.3 <- data_locomotion_reduced %>%
 plot1.3
 ```
 
-Plotting treatment and sex effectd
+Plotting treatment and sex effects
 
 ```{r locomotion treatment and sex effects}
 
@@ -634,8 +640,146 @@ plot1.4
 
 ### Ymaze
 
+Distribution of trigrams
 
-### Habituation
+```{r 33_base_plots}
+
+data_ymaze_reduced_long <- data_ymaze_reduced %>%
+  pivot_longer(cols = c('LLL', 'LLR', 'LRL','LRR', 'RLL', 'RLR', 'RRL', 'RRR'), names_to = "Trigram", values_to = "Count")
+
+plot2.1 <- data_ymaze_reduced_long %>%
+  # filter(n > 0) %>%
+  ggplot(aes(x = Trigram, y = Count)) +
+  geom_bar(stat = "sum") +
+  theme_classic() + labs(x = 'Trigram', y = 'Total count') +
+  theme(legend.position = "none", text = element_text(size = 15))
+plot2.1
+```
+
+General variation in repetition and alteration behaviour.
+
+```{r 34_summary_histogram}
+
+plot2.4 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type") %>%
+  ggplot(aes(x = Type, y = Count_type)) +
+  geom_bar(stat = "sum") +
+  theme_classic() + theme(text = element_text(size = 15)) +
+  labs(x = "Repetitions vs Alternations", y = 'Count')
+plot2.4
+```
+
+Treatment and Sex effects
+```{r 33_base_plots}
+
+plot2.1 <- data_ymaze_reduced_long %>%
+  filter(Sex == "M") %>%
+  ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
+  geom_bar(stat = "sum") +
+  ylim(0,7000) +
+  theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Males') +
+  theme(text = element_text(size = 15), legend.position = "none") 
+
+
+plot2.1a <- data_ymaze_reduced_long %>%
+  filter(Sex == "F") %>%
+  ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
+  geom_bar(stat = "sum") +
+  ylim(0,7000) +
+  theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Females') +
+  theme( text = element_text(size = 15))
+p <- (plot2.1 + plot2.1a)
+p
+
+
+plot2.4 <-
+  data_ymaze_reduced_long %>% pivot_longer(
+    cols = c('reps', 'alter'),
+    names_to = "Type",
+    values_to = "Count_type") %>%
+  filter(Sex == "M") %>%
+  ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
+  geom_bar(stat = "sum") +
+  ylim(0,16000) +
+  theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+  labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Males')
+plot2.4
+
+plot2.4a <-
+  data_ymaze_reduced_long %>% pivot_longer(
+    cols = c('reps', 'alter'),
+    names_to = "Type",
+    values_to = "Count_type") %>%
+  filter(Sex == "F") %>%
+  ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
+  geom_bar(stat = "sum") +
+  ylim(0,16000) +
+  theme_classic() + theme(text = element_text(size = 15)) +
+  labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Females')
+plot2.4a
+
+pa <- (plot2.4 + plot2.4a)
+pa
+```
+
+
+### Startle
+
+```{r 44_base_plots}
+
+data_startle_act_reduced<-subset(data_startle_act_reduced, select = -Comment)
+
+#Average treatment and sex effects with each startle
+#creating summary data of treatment and sex effects
+data_startle_act_reduced$startle_number<- as.factor(data_startle_act_reduced$startle_number)
+data_startle_act_reduced$Treatment<- as.factor(data_startle_act_reduced$Treatment)
+
+g<-data_startle_act_reduced %>%
+  group_by(Treatment,Sex, startle_number) %>%
+  summarise(mean=mean(distance), sd = sd(distance))
+
+
+p1 <- na.omit(g) %>%
+  filter(Sex == "M") %>%
+  ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
+  geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
+                width = 1,
+                position = position_dodge(1)) +
+  geom_point(position = position_dodge(1)) + theme_classic() +
+  ylim(-2, 10) + theme(text = element_text(size = 15), legend.position = "none") + labs(x = 'Treatment',
+                                                              y = 'Total distance travelled',
+                                                              col = "Startle number",
+                                                              title = "Males")
+
+
+p2 <- na.omit(g) %>%
+  filter(Sex == "F") %>%
+  ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
+  geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
+                width = 1,
+                position = position_dodge(1)) +
+  geom_point(position = position_dodge(1)) + theme_classic() +
+  ylim(-2, 10) +
+  theme(text = element_text(size = 15)) + labs(x = 'Treatment',
+                                               y = 'Total distance travelled',
+                                               col = "Startle number",
+                                               title = "Females")
+
+
+
+P <- (p1 + p2)
+P
+
+# habituation data by individual - only active flies
+plot3.2 <- ggplot(data=data_startle_act_reduced, aes(x = startle_number, y = distance)) +
+  facet_wrap(facets = ~ Individual_ID) +
+  geom_line() +
+  geom_point() + theme_bw() +
+  scale_x_continuous(breaks = c(1,2,3)) +
+  scale_y_continuous(breaks = c(10, 30)) +
+  theme(strip.text.x = element_blank(), text = element_text(size = 15)) +
+  labs(x = 'Startle number', y = 'Total distance travelled')
+plot3.2
+```
 
 ## Mean models
 
