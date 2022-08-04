@@ -41,6 +41,9 @@ data_ymaze <- read.csv(here("Data/data_ymaze.csv"))
 data_startle_act <- read.csv(here("Data/data_startle_act.csv")) #no startles removed
 #TODO need to add column of individual ID to session data to join
 data_startle <- read.csv(here("Data/data_startle.csv")) 
+
+
+Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
 ```
 
 ## Data processing 
@@ -124,8 +127,6 @@ glimpse(data_locomotion)
 ```
 
 ```{r 5_merge_alrge_data_with_session_data, eval = FALSE}
-Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
-
 # data_locomotion$Individual_ID <- paste(data_locomotion$Datafile_ID, data_locomotion$well_id, sep = "_")
 
 
@@ -558,8 +559,16 @@ overall_summary <- startles_only %>%
   group_by(startle_number) %>%
   get_summary_stats(distance, type = "mean_sd")
 
+binary_summary <- startles_only %>%
+  group_by(Individual_ID) %>%
+  summarise(startle_binary = ifelse(sum(distance) != 0, 1, 0))
+
+startle_binary <- binary_summary %>%
+  left_join(Session_data, by = 'Individual_ID')
+  
 write.table(startles_only, file = "./data/data_startle.csv", sep = ",", row.names = F)
 write.table(startles_only_act, file = "./data/data_startle_act.csv", sep = ",", row.names = F)
+write.table(startle_binary, file = "./data/data_startle_binary.csv", sep = ",", row.names = F)
 ```
 
 ## Assays assessed separately
@@ -624,6 +633,9 @@ plot1.4
 ```
 
 ### Ymaze
+
+
+### Habituation
 
 ## Mean models
 
