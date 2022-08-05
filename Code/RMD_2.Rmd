@@ -4,14 +4,14 @@ author: "Erin Macartney"
 date: "`r Sys.Date()`"
 output:
   rmdformats::robobook:
-      code_folding: show
+      code_folding: hide
       toc_depth: 3
 editor_options: 
   chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ```{r, message = F}
@@ -36,18 +36,16 @@ Loading session data with treatments and sex etc
 #Loading in session data
 Session_data <- read_excel(here("Data/session_data/Session_data_extended.xlsx"))
 data_locomotion <- read.csv(here("Data/data_locomotion.csv"))
-data_ymaze <- read.csv(here("Data/data_ymaze.csv"))
-#TODO why is there data in the 15th ymaze?
+data_ymaze <- read.csv(here("Data/data_ymaze.csv")) #not that this still has the 15th ymaze included in dataset but this is removed through na.omit later
 
 data_startle_act <- read.csv(here("Data/data_startle_act.csv")) #no startles removed
-#TODO need to add column of individual ID to session data to join
 data_startle <- read.csv(here("Data/data_startle.csv")) 
 
 
 Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
 ```
 
-## Data processing 
+## Data processing {.tabset}
 
 ### Locomotion
 
@@ -575,7 +573,7 @@ write.table(startle_binary, file = "./data/data_startle_binary.csv", sep = ",", 
 ## Assays assessed separately
 
 Removing the individuals that got mixed up/went missing etc for the 'mean' response analysis
-```{r removing individuals, eval = FALSE}
+```{r 28_removing individuals}
 
 data_locomotion$Exclude_mean <- as.factor(data_locomotion$Exclude_mean)
 
@@ -588,12 +586,12 @@ data_startle_act_reduced <- droplevels(data_startle_act[!data_startle_act$Exclud
 
 ```
 
-## Visualisations 
+## Visualisations {.tabset}
 
 ### Locomotion 
 
 Plotting average locomotion and individual differences
-```{r locomotion average effects}
+```{r 29_locomotion average effects, warning=FALSE}
 data_locomotion_avg <-data_locomotion_reduced %>%
   group_by(Individual_ID) %>%
   summarise(avg = mean(arena_distance))
@@ -624,7 +622,7 @@ plot1.3
 
 Plotting treatment and sex effects
 
-```{r locomotion treatment and sex effects}
+```{r 30_locomotion treatment and sex effects}
 
 data_locomotion_reduced<-subset(data_locomotion_reduced, select = -Comment)
 data_locomotion_reduced$Treatment<-as.factor(data_locomotion_reduced$Treatment)
@@ -642,7 +640,7 @@ plot1.4
 
 Distribution of trigrams
 
-```{r 33_base_plots}
+```{r 31_base_plots}
 
 data_ymaze_reduced_long <- data_ymaze_reduced %>%
   pivot_longer(cols = c('LLL', 'LLR', 'LRL','LRR', 'RLL', 'RLR', 'RRL', 'RRR'), names_to = "Trigram", values_to = "Count")
@@ -650,7 +648,7 @@ data_ymaze_reduced_long <- data_ymaze_reduced %>%
 plot2.1 <- data_ymaze_reduced_long %>%
   # filter(n > 0) %>%
   ggplot(aes(x = Trigram, y = Count)) +
-  geom_bar(stat = "sum") +
+  geom_col(position = "stack")+
   theme_classic() + labs(x = 'Trigram', y = 'Total count') +
   theme(legend.position = "none", text = element_text(size = 15))
 plot2.1
@@ -658,20 +656,21 @@ plot2.1
 
 General variation in repetition and alteration behaviour.
 
-```{r 34_summary_histogram}
+```{r 32_summary_histogram}
 
-plot2.4 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type") %>%
+plot2.2 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type") %>%
   ggplot(aes(x = Type, y = Count_type)) +
-  geom_bar(stat = "sum") +
+  geom_col(position = "stack") +
   theme_classic() + theme(text = element_text(size = 15)) +
   labs(x = "Repetitions vs Alternations", y = 'Count')
-plot2.4
+plot2.2
 ```
 
 Treatment and Sex effects
+
 ```{r 33_base_plots}
 
-plot2.1 <- data_ymaze_reduced_long %>%
+plot2.3 <- data_ymaze_reduced_long %>%
   filter(Sex == "M") %>%
   ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
   geom_bar(stat = "sum") +
@@ -680,51 +679,62 @@ plot2.1 <- data_ymaze_reduced_long %>%
   theme(text = element_text(size = 15), legend.position = "none") 
 
 
-plot2.1a <- data_ymaze_reduced_long %>%
+plot2.4 <- data_ymaze_reduced_long %>%
   filter(Sex == "F") %>%
   ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
-  geom_bar(stat = "sum") +
+  geom_bar(stat = "sum")  +
   ylim(0,7000) +
   theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Females') +
   theme( text = element_text(size = 15))
-p <- (plot2.1 + plot2.1a)
-p
+plot2.5 <- (plot2.3 + plot2.4)
+plot2.5
 
 
-plot2.4 <-
+plot2.5 <-
   data_ymaze_reduced_long %>% pivot_longer(
     cols = c('reps', 'alter'),
     names_to = "Type",
     values_to = "Count_type") %>%
   filter(Sex == "M") %>%
   ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
-  geom_bar(stat = "sum") +
+  geom_bar(stat = "sum")  +
   ylim(0,16000) +
   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
   labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Males')
-plot2.4
 
-plot2.4a <-
+plot2.6 <-
   data_ymaze_reduced_long %>% pivot_longer(
     cols = c('reps', 'alter'),
     names_to = "Type",
     values_to = "Count_type") %>%
   filter(Sex == "F") %>%
   ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
-  geom_bar(stat = "sum") +
+  geom_bar(stat = "sum")  +
   ylim(0,16000) +
   theme_classic() + theme(text = element_text(size = 15)) +
   labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Females')
-plot2.4a
 
-pa <- (plot2.4 + plot2.4a)
-pa
+
+plot2.7 <- (plot2.5 + plot2.6)
+plot2.7
 ```
 
+Treatment and sex within reps
+
+``` {r}
+plot2.8 <- na.omit(data_ymaze_reduced_long) %>%
+  ggplot(aes(x = Sex, y = reps, fill = Treatment)) +
+  geom_bar(stat = "sum")+
+  theme_classic() + theme(text = element_text(size = 15)) +
+  labs( y = "Number of repetitions")
+plot2.8
+
+
+```
 
 ### Startle
 
-```{r 44_base_plots}
+```{r 34_base_plots}
 
 data_startle_act_reduced<-subset(data_startle_act_reduced, select = -Comment)
 
@@ -738,7 +748,7 @@ g<-data_startle_act_reduced %>%
   summarise(mean=mean(distance), sd = sd(distance))
 
 
-p1 <- na.omit(g) %>%
+plot3.1 <- na.omit(g) %>%
   filter(Sex == "M") %>%
   ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
   geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
@@ -751,7 +761,7 @@ p1 <- na.omit(g) %>%
                                                               title = "Males")
 
 
-p2 <- na.omit(g) %>%
+plot3.2<- na.omit(g) %>%
   filter(Sex == "F") %>%
   ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
   geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
@@ -766,11 +776,12 @@ p2 <- na.omit(g) %>%
 
 
 
-P <- (p1 + p2)
-P
+plot3.3 <- (plot3.1 + plot3.2)
+plot3.3
 
 # habituation data by individual - only active flies
-plot3.2 <- ggplot(data=data_startle_act_reduced, aes(x = startle_number, y = distance)) +
+data_startle_act_reduced$startle_number<- as.integer(data_startle_act_reduced$startle_number)
+plot3.4 <- ggplot(data=data_startle_act_reduced, aes(x = startle_number, y = distance)) +
   facet_wrap(facets = ~ Individual_ID) +
   geom_line() +
   geom_point() + theme_bw() +
@@ -778,10 +789,12 @@ plot3.2 <- ggplot(data=data_startle_act_reduced, aes(x = startle_number, y = dis
   scale_y_continuous(breaks = c(10, 30)) +
   theme(strip.text.x = element_blank(), text = element_text(size = 15)) +
   labs(x = 'Startle number', y = 'Total distance travelled')
-plot3.2
+plot3.4
 ```
 
-## Mean models
+## Mean models {.tabset}
+
+### Locomotion
 
 ```{r locomotion mean effect}
 
@@ -800,4 +813,28 @@ summary(m2)
 
 anova(m, m2) %>% kbl() %>% kable_material(c("striped"))
 
+```
+
+###  Ymaze
+
+```{r ymaze mean effect}
+# model: variance between rounds, individuals and batches, fixed effect of sex and assay date
+# data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type")
+
+
+m3 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
+summary(m3)
+
+m4 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
+summary(m4)
+
+```
+
+### Startle
+
+```{r startle mean effect}
+m5 <- lmer(distance ~ Sex*Treatment + (1|Batch) + (startle_number|Individual_ID),
+               data = data_startle_act_reduced)
+#boundary fit is singular
+summary(m5)
 ```
