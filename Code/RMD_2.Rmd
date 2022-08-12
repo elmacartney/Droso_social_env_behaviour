@@ -856,3 +856,126 @@ m5 <- lmer(distance ~ Sex*Treatment + (1|Batch) + (startle_number|Individual_ID)
 #boundary fit is singular
 summary(m5)
 ```
+
+Looking if the slopes with each startle differ between startle 
+
+```{r startle mean effect_slope}
+
+m6 <- lmer(distance ~ Sex*Treatment + Sex*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
+
+summary(m6) #significant interaction with sex and startle number
+
+qplot(residuals(m6)) + theme_classic()
+
+```
+
+## Correlations Visualisations
+
+### Locomotion and ymaze
+
+```{r joining loco ymaze}
+data_loco_ymaze <- left_join(data_locomotion_reduced, data_ymaze_reduced_long, by = 'ID') %>% 
+  select(ID, arena_distance, reps, alter, partial, Sex.x, Treatment.x) %>%
+  group_by(ID) %>%
+  mutate(avg_loco = mean(arena_distance)) %>%
+  select(ID, reps, alter, partial, Sex.x, Treatment.x, avg_loco) %>%
+ distinct()
+```
+
+#### Reps
+
+```{r locomotion_reps}
+#not including treatment as there was no effect of treatment on
+
+#TODO check if we need to remove any individuals 
+p1a <- ggplot(na.omit(data_loco_ymaze), x = reps, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x) +
+  geom_point(aes(x = reps, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) + 
+  geom_smooth(method = lm, aes(x = reps, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) +
+  theme_classic()
+
+
+# just sex
+p1b <- ggplot(na.omit(data_loco_ymaze), x = reps, y = log(avg_loco+1), shape = Sex.x) +
+  geom_point(aes(x = reps, y = log(avg_loco+1), shape = Sex.x)) + 
+  geom_smooth(method = lm, aes(x = reps, y = log(avg_loco+1), 
+                               shape = Sex.x))+
+  theme_classic()
+
+# just treatment
+
+p1c <- ggplot(na.omit(data_loco_ymaze), x = reps, y = log(avg_loco+1), color = Treatment.x) +
+  geom_point(aes(x = reps, y = log(avg_loco+1), color = Treatment.x)) + 
+  geom_smooth(method = lm, aes(x = reps, y = log(avg_loco+1), color = Treatment.x))+
+  theme_classic()
+
+p1 <- (p1a/p1b/p1c)
+p1
+```
+
+#### Alters
+
+```{r locomotion_alters}
+#not including treatment as there was no effect of treatment on
+
+#TODO check if we need to remove any individuals 
+p2a <- ggplot(na.omit(data_loco_ymaze), x = alter, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x) +
+  geom_point(aes(x = alter, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) + 
+  geom_smooth(method = lm, aes(x = alter, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) +
+  theme_classic()
+
+
+# just sex
+p2b <- ggplot(na.omit(data_loco_ymaze), x = alter, y = log(avg_loco+1), shape = Sex.x) +
+  geom_point(aes(x = alter, y = log(avg_loco+1), shape = Sex.x)) + 
+  geom_smooth(method = lm, aes(x = alter, y = log(avg_loco+1), 
+                               shape = Sex.x))+
+  theme_classic()
+
+# just treatment
+p2c <- ggplot(na.omit(data_loco_ymaze), x = alter, y = log(avg_loco+1), color = Treatment.x) +
+  geom_point(aes(x = alter, y = log(avg_loco+1), color = Treatment.x)) + 
+  geom_smooth(method = lm, aes(x = alter, y = log(avg_loco+1), color = Treatment.x))+
+  theme_classic()
+
+p2 <- (p2a/p2b/p2c)
+p2
+```
+
+### Locomotion and Startle
+
+```{r joining loco startle}
+data_loco_startle <- left_join(data_locomotion_reduced, data_startle_act_reduced, by = 'ID') %>% 
+  select(ID, startle_number, distance, arena_distance, Sex.x, Treatment.x) %>%
+  group_by(ID) %>%
+  mutate(avg_startle = mean(distance)) %>%
+  mutate(avg_loco = mean(arena_distance)) %>%
+  ungroup() %>%
+  select(ID, Sex.x, Treatment.x, avg_startle, avg_loco) %>%
+  distinct()
+
+#note that there is much lower cross over between individuals with both loco and habituation observations
+  
+```
+
+```{r loco startle}
+p3a <- ggplot(na.omit(data_loco_startle), x = log(avg_startle), y = log(avg_loco+1), color = Treatment.x, shape = Sex.x) +
+  geom_point(aes(x = log(avg_startle), y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) + 
+  geom_smooth(method = lm, aes(x = log(avg_startle), y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) +
+  theme_classic()
+
+#just Sex
+p3b <- ggplot(na.omit(data_loco_startle), x = log(avg_startle), y = log(avg_loco+1), shape = Sex.x) +
+  geom_point(aes(x = log(avg_startle), y = log(avg_loco+1), shape = Sex.x)) + 
+  geom_smooth(method = lm, aes(x = log(avg_startle), y = log(avg_loco+1), shape = Sex.x)) +
+  theme_classic()
+
+#just treatment
+p3c <- ggplot(na.omit(data_loco_startle), x = log(avg_startle), y = log(avg_loco+1), color = Treatment.x) +
+  geom_point(aes(x = log(avg_startle), y = log(avg_loco+1), color = Treatment.x)) + 
+  geom_smooth(method = lm, aes(x = log(avg_startle), y = log(avg_loco+1), color = Treatment.x)) +
+  theme_classic()
+
+p3 <- (p3a/p3b/p3c)
+p3
+
+```
