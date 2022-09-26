@@ -681,20 +681,22 @@ plot2.2
 Treatment and Sex effects
 
 ```{r 33_base_plots}
+data_ymaze_reduced_long$Treatment<-as.factor(data_ymaze_reduced_long$Treatment)
 
+#males
 plot2.3 <- data_ymaze_reduced_long %>%
   filter(Sex == "M") %>%
   ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
-  geom_bar(stat = "sum") +
+  geom_col() +
   ylim(0,7000) +
   theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Males') +
   theme(text = element_text(size = 15), legend.position = "none") 
 
-
+#females
 plot2.4 <- data_ymaze_reduced_long %>%
   filter(Sex == "F") %>%
   ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
-  geom_bar(stat = "sum")  +
+  geom_col()  +
   ylim(0,7000) +
   theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Females') +
   theme( text = element_text(size = 15))
@@ -702,36 +704,96 @@ plot2.5 <- (plot2.3 + plot2.4)
 plot2.5
 
 
-plot2.5 <-
-  data_ymaze_reduced_long %>% pivot_longer(
+data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>% pivot_longer(
     cols = c('reps', 'alter'),
     names_to = "Type",
-    values_to = "Count_type") %>%
-  filter(Sex == "M") %>%
-  ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
-  geom_bar(stat = "sum")  +
-  ylim(0,16000) +
+    values_to = "Count_type")
+
+data_ymaze_reduced_long3 <- data_ymaze_reduced_long2 [c("Individual_ID", "Sex", "Type","Treatment", "Count_type")]
+
+data_ymaze_reduced_long4 <- distinct(data_ymaze_reduced_long3)
+
+data_summary <- function(x) {
+   m <- mean(x)
+   ymin <- m-sd(x)
+   ymax <- m+sd(x)
+   return(c(y=m,ymin=ymin,ymax=ymax))
+}
+
+data_ymaze_reduced_long4$Type<-as.factor(data_ymaze_reduced_long4$Type)
+data_ymaze_reduced_long4$Sex<-as.factor(data_ymaze_reduced_long4$Sex)
+
+#males
+plot2.6 <- na.omit(data_ymaze_reduced_long4) %>% 
+ filter(Sex == "M") %>%
+  ggplot(aes(x = Treatment, y = Count_type, fill = Type)) + 
+  geom_violin(position = position_dodge(1)) + stat_summary(fun.data=data_summary, position = position_dodge(1))  + labs(x = "Treatment", y = "Count_type") +
+  ylim(0,200) +
   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
-  labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Males')
+  labs(x = "Treatment", y = 'Count', title = 'Males')
 
-plot2.6 <-
-  data_ymaze_reduced_long %>% pivot_longer(
-    cols = c('reps', 'alter'),
-    names_to = "Type",
-    values_to = "Count_type") %>%
-  filter(Sex == "F") %>%
-  ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
-  geom_bar(stat = "sum")  +
-  ylim(0,16000) +
+
+#females
+plot2.7 <- na.omit(data_ymaze_reduced_long4) %>% 
+ filter(Sex == "F") %>%
+  ggplot(aes(x = Treatment, y = Count_type, fill = Type)) + 
+  geom_violin(position = position_dodge(1)) + stat_summary(fun.data=data_summary, position = position_dodge(1))  + labs(x = "Treatment", y = "Count_type") +
+  ylim(0,200) +
   theme_classic() + theme(text = element_text(size = 15)) +
-  labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Females')
+  labs(x = "Treatment", y = 'Count', title = 'Females')
+
+plot2.8 <- (plot2.6 + plot2.7)
+plot2.8
 
 
-plot2.7 <- (plot2.5 + plot2.6)
-plot2.7
+
+plot2.9 <- na.omit(data_ymaze_reduced_long4) %>%
+  filter(Sex == "M") %>%
+  ggplot(aes(x = Treatment, y = Count_type, fill = Type)) + 
+  geom_bar(position = "fill", stat = "identity")+
+  theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+  labs(x = "Treatment", y = 'Count', title = 'Males')
+
+
+plot2.10 <- na.omit(data_ymaze_reduced_long4) %>%
+  filter(Sex == "F") %>%
+  ggplot(aes(x = Treatment, y = Count_type, fill = Type)) + 
+  geom_bar(position = "fill", stat = "identity")+
+  theme_classic() + theme(text = element_text(size = 15)) +
+  labs(x = "Treatment", y = 'Count', title = 'Females')
+
+plot2.11 <- (plot2.9 + plot2.10)
+plot2.11
+ 
+#calculating percent scores
+
+# plot2.6 <-
+#   data_ymaze_reduced_long %>% pivot_longer(
+#     cols = c('reps', 'alter'),
+#     names_to = "Type",
+#     values_to = "Count_type") %>%
+#   filter(Sex == "M") %>%
+#   ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
+#   geom_col()  +
+#   ylim(0,16000) +
+#   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+#   labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Males')
+
+# plot2.7 <-
+#   data_ymaze_reduced_long %>% pivot_longer(
+#     cols = c('reps', 'alter'),
+#     names_to = "Type",
+#     values_to = "Count_type") %>%
+#   filter(Sex == "F") %>%
+#   ggplot(aes(x = Type, y = Count_type, fill = Treatment)) +
+#   geom_col()  +
+#   ylim(0,16000) +
+#   theme_classic() + theme(text = element_text(size = 15)) +
+#   labs(x = "Repetitions vs Alternations", y = 'Count', title = 'Females')
+# 
 ```
 
-Treatment and sex within reps
+<!-- Treatment and sex within reps -->
 
 ``` {r}
 # plot2.8 <- na.omit(data_ymaze_reduced_long) %>%
@@ -740,13 +802,13 @@ Treatment and sex within reps
 #   theme_classic() + theme(text = element_text(size = 15)) +
 #   labs( y = "Number of repetitions")
 # plot2.8
-data_ymaze_reduced_long<-subset(data_ymaze_reduced_long, select = -Comment)
-
-plot2.8 <- na.omit(data_ymaze_reduced_long) %>% 
-  ggplot(aes(x = Treatment, y = reps, fill = Sex)) + 
-  geom_violin(position = position_dodge(1)) + stat_summary(fun.data=data_summary, position = position_dodge(1))  + labs(x = "Treatment", y = "Number of reps") + theme_classic()
-
-plot2.8
+# data_ymaze_reduced_long<-subset(data_ymaze_reduced_long, select = -Comment)
+# 
+# plot2.8 <- na.omit(data_ymaze_reduced_long) %>% 
+#   ggplot(aes(x = Treatment, y = reps, fill = Sex)) + 
+#   geom_violin(position = position_dodge(1)) + stat_summary(fun.data=data_summary, position = position_dodge(1))  + labs(x = "Treatment", y = "Number of reps") + theme_classic()
+# 
+# plot2.8
 
 ```
 
