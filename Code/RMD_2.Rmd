@@ -27,6 +27,7 @@ library(car)
 library(RColorBrewer)
 library(readxl)
 library(patchwork)
+library(car)
 ```
 
 ## Loading data
@@ -905,8 +906,16 @@ anova(m, m2) %>% kbl() %>% kable_material(c("striped"))
 m3 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m3)
 
+# this requires "car" pacakge
+Anova(m3, test  = "Chisq")
+
 m4 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m4)
+
+# TODO adding models to see hidden contrasts
+#need to run m3 and m3a to get all contrasts
+m3a <-glmer(alter~ Sex*relevel(factor(Treatment), ref = "GS") + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
+summary(m3a)
 
 ```
 
@@ -926,6 +935,8 @@ Looking if the slopes with each startle differ between startle
 m6 <- lmer(distance ~ Sex*Treatment + Sex*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
 
 summary(m6) #significant interaction with sex and startle number
+
+anova(m6)
 
 qplot(residuals(m6)) + theme_classic()
 
@@ -1016,6 +1027,10 @@ data_loco_startle <- left_join(data_locomotion_reduced, data_startle_act_reduced
   distinct()
 
 #note that there is much lower cross over between individuals with both loco and habituation observations
+
+#TODO adding this
+
+cor.test(data_loco_startle$avg_startle, data_loco_startle$avg_loco)
   
 ```
 
