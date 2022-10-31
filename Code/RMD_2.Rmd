@@ -874,17 +874,18 @@ anova(m, m2) %>% kbl() %>% kable_material(c("striped"))
 # model: variance between rounds, individuals and batches, fixed effect of sex and assay date
 # data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type")
 
-#TODO does it make more sense to have type in the 3-way interaction??
-m <- glmer(Count_type~ Type*Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
-Anova(m)
+# m <- glmer(Count_type~ Type*Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
+# Anova(m)
 
 ma <- glmer(Count_type~ Type + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
+Anova(ma)
+summary(ma)
 
 m3 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m3)
 
 # this requires "car" pacakge
-Anova(m3, test  = "Chisq")
+Anova(m3)
 
 m4 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m4)
@@ -926,9 +927,9 @@ Anova(m6b)#model used in manuscript
 
 anova(m6b,m6) #can remove Treatment*startle_number but I think it makes sense to keep because it's closely related to our hypotheses
 
-m6c <- lmer(distance ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
+m6c <- lmer(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
 
-Anova(m6c)
+Anova(m6c) #three-way interaction is significant
 
 anova(m6b,m6c)
 
