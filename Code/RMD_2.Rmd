@@ -910,6 +910,8 @@ summary(ma)
 m3 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m3)
 
+#TODO asymmetry: 0 = random left vs right (symmetrical), positive = excess of left turns, negative = excess of right turns
+
 # this requires "car" pacakge
 Anova(m3)
 
@@ -1050,6 +1052,8 @@ data_loco_startle <- left_join(data_locomotion_reduced, data_startle_act_reduced
 #TODO adding this
 
 cor.test(data_loco_startle$avg_startle, data_loco_startle$avg_loco)
+
+#could do a simple t test between the different treatments since we get the correlation and SE. Just look at between treatment and between sex. 
   
 ```
 
