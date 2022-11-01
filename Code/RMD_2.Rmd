@@ -628,8 +628,7 @@ General variation in repetition and alteration behaviour.
 
 data_ymaze_reduced_long_trigramtype <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type") %>%
   select(-c(Trigram, Count)) %>%
-  distinct()
-
+  distinct() 
 
 plot2.2 <- data_ymaze_reduced_long_trigramtype %>%
   ggplot(aes(x = Type, y = Count_type)) +
@@ -657,6 +656,14 @@ plot2.3 <- data_ymaze_reduced_long %>%
   ylim(0,7000) +
   theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Males') +
   theme(text = element_text(size = 15), legend.position = "none") 
+
+plot2.2 <- data_ymaze_reduced_long_trigramtype %>%
+  ggplot(aes(x = Type, y = Count_type)) +
+  geom_col(position = "stack") +
+  theme_classic() + theme(text = element_text(size = 15)) +
+  labs(x = "Trigram type", y = 'Count')
+
+
 
 #females
 plot2.4 <- data_ymaze_reduced_long %>%
@@ -737,23 +744,42 @@ data_ymaze_reduced_long_trigramtype$Sex<-as.factor(data_ymaze_reduced_long_trigr
 
 #plotting reps and alters separately
 
+# plot2.12 <- na.omit(data_ymaze_reduced_long4) %>%
+#   filter(Type == "alter") %>%
+#   ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) + 
+#   geom_bar(position = "fill", stat = "identity")+
+#   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+#   labs(x = "Treatment", y = 'Count', title = 'Alternations') +
+#   scale_fill_brewer(palette = "Set1") 
+
+
 plot2.12 <- na.omit(data_ymaze_reduced_long4) %>%
   filter(Type == "alter") %>%
-  ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) + 
-  geom_bar(position = "fill", stat = "identity")+
+  ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) + geom_col(position = "stack")+
   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
   labs(x = "Treatment", y = 'Count', title = 'Alternations') +
-  scale_fill_brewer(palette = "Set1") 
+  scale_fill_brewer(palette = "Set1") +
+  ylim(0,10000)
+
+
+# plot2.13 <- na.omit(data_ymaze_reduced_long4) %>%
+#   filter(Type == "reps") %>%
+#   ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) +
+#   geom_bar(position = "fill", stat = "identity") +
+#   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+#   labs(x = "Treatment", y = 'Count', title = 'Repetitions') +
+#   scale_fill_brewer(palette = "Set1") 
 
 
 plot2.13 <- na.omit(data_ymaze_reduced_long4) %>%
   filter(Type == "reps") %>%
-  ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) +
-  geom_bar(position = "fill", stat = "identity") +
+  ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) + geom_col(position = "stack") +
   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
   labs(x = "Treatment", y = 'Count', title = 'Repetitions') +
-  scale_fill_brewer(palette = "Set1") 
-  
+  scale_fill_brewer(palette = "Set1") +
+  ylim(0,10000)
+
+
 
 plot2.14 <- (plot2.12 + plot2.13) 
 plot2.14 # red = female, blue = male
