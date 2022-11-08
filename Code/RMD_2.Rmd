@@ -536,6 +536,10 @@ data_ymaze_reduced <- droplevels(data_ymaze[!data_ymaze$Exclude_mean == 'exclude
 
 data_startle_act_reduced <- droplevels(data_startle_act[!data_startle_act$Exclude_mean == 'exclude',])
 
+#getting N
+n_distinct(data_locomotion_reduced$Individual_ID)
+n_distinct(data_ymaze_reduced$Individual_ID)
+n_distinct(data_startle_act_reduced$Individual_ID) #why is this soooo low???
 
 ```
 
