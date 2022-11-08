@@ -28,6 +28,7 @@ library(RColorBrewer)
 library(readxl)
 library(patchwork)
 library(car)
+library(rptR)
 ```
 
 ## Loading data
@@ -880,10 +881,18 @@ m <- lmer(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch),
 summary(m) #model included in results
 #males for active than females, no effect of treatment
 Anova(m)
-
-
 qplot(residuals(m)) + theme_classic()
 
+
+rept <- rpt(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"), data = data_locomotion_reduced, datatype = "Gaussian", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+
+print(rept)
+
+#individual_id % var
+1.124 / (1.124 + 0.152 + 1.248 + 0.159)*100
+
+#batch 
+0.152 / (1.124 + 0.152 + 1.248 + 0.159)*100
 
 #sex specific between individual variation
 m2 <- lmer(log(arena_distance+1) ~ Treatment*Sex + (Sex|Individual_ID) + (1|Batch), dat = data_locomotion_reduced)
@@ -900,8 +909,8 @@ anova(m, m2) %>% kbl() %>% kable_material(c("striped"))
 # model: variance between rounds, individuals and batches, fixed effect of sex and assay date
 # data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type")
 
-# m <- glmer(Count_type~ Type*Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
-# Anova(m)
+m <- glmer(Count_type~ Type*Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
+Anova(m)
 
 ma <- glmer(Count_type~ Type + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
 Anova(ma)
@@ -914,10 +923,30 @@ summary(m3)
 
 # this requires "car" pacakge
 Anova(m3)
+rept <- rpt(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"),data = data_ymaze_reduced_long, datatype = "Poisson",link = "log", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+
+print(rept)
+
+#individual_ID
+1.57 / (1.57 + 0.053 + 0.098 + 0.558)*100
+
+#batch
+0.053 / (1.57 + 0.053 + 0.098 + 0.558)*100
+
 
 m4 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m4)
 Anova(m4)
+
+rept <- rpt(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"),data = data_ymaze_reduced_long, datatype = "Poisson",link = "log", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+
+print(rept)
+
+#individual_ID
+1.936 / (1.936 + 0.106 + 0.025 + 1.156)*100
+
+
+0.106 / (1.936 + 0.106 + 0.025 + 1.156)*100
 
 
 # TODO adding models to see hidden contrasts
@@ -935,6 +964,8 @@ m5 <- lmer(log(distance +1) ~ Sex*Treatment + (1|Batch) + (startle_number|Indivi
 #boundary fit is singular
 summary(m5)
 Anova(m5)
+
+
 ```
 
 Looking if the slopes with each startle differ between startle 
@@ -951,13 +982,24 @@ qplot(residuals(m6)) + theme_classic()
 
 m6b <- lmer(log(distance +1) ~ Sex*Treatment + Sex*startle_number + Treatment*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
 
-Anova(m6b)#model used in manuscript
+Anova(m6b)
 
-anova(m6b,m6) #can remove Treatment*startle_number but I think it makes sense to keep because it's closely related to our hypotheses
+
+anova(m6b,m6) 
 
 m6c <- lmer(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
 
-Anova(m6c) #three-way interaction is significant
+Anova(m6c) #model used in manuscript
+
+rept <- rpt(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), grname  = c("Individual_ID", "Batch", "Fixed", "Residual"), data = data_startle_act_reduced, datatype = "Gaussian", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+
+print(rept)
+
+#individual
+0.134 / (0.134 + 0+ 0.708 + 0.07)*100
+
+#batch
+0 /(0.134 + 0+ 0.708 + 0.07)*100
 
 anova(m6b,m6c)
 
