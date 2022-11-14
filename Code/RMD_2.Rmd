@@ -93,10 +93,10 @@ data_compiler <- function(filename, data_path) {
   # dat_temp_df$date <- assay_date
   
   dat_temp_df <-
-  dat_temp_df %>%
-  pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
-  rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
-         variable = VARIABLE)
+    dat_temp_df %>%
+    pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
+    rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
+           variable = VARIABLE)
   
   dat_temp_df$Individual_ID <- paste(dat_temp_df$Datafile_ID, dat_temp_df$well_id, sep = "_")
   
@@ -109,8 +109,8 @@ data_compiler <- function(filename, data_path) {
   # dat_temp_df$Filename <- filename
   
   dat_temp_df <- dat_temp_df %>% select(Individual_ID, Datafile_ID,
-                                      temperature, round, arena_distance)
-
+                                        temperature, round, arena_distance)
+  
   return(dat_temp_df)
 }
 ```
@@ -178,7 +178,7 @@ id_test <- grep(pattern1, test1) # use (simplified) RE to select lines
 # [EDIT] apparently read_delim no longer works with just vectors, now needs `I()`
 # this extracts (messy) run and temporary data from each file
 test_dat <- read_delim(file = I(test1[-id_test]), col_names = T, delim = ',',
-                      quote = '\"', skip = 6, n_max = 3)
+                       quote = '\"', skip = 6, n_max = 3)
 
 # helper function that parses the (messy) run data into a readable format)
 head_parser <- function(path, filename) {
@@ -224,9 +224,9 @@ dat_raw[[3]][[1]]
 # processed only for consistency
 dat_raw_summ <- tibble(data_files = data_files) %>%
   mutate(data = map(data_files, ~ data_parser(pattern1,
-                                data_path,
-                                .x,
-                                summary = T)))
+                                              data_path,
+                                              .x,
+                                              summary = T)))
 dat_raw_summ[[2]] <- dat_raw_summ[[2]] %>%
   map(~ select(.x, !c(...1, ...2, ...3))) %>%
   map(~ rename(.x, Summary_stat = ...4))
@@ -323,12 +323,12 @@ dat_an2$Individual_ID <- paste0(dat_an2$Datafile_ID, "_", dat_an2$Arena)
 
 dat_an2 <- dat_an2 %>%
   left_join(Session_data, by = "Individual_ID")
-  # mutate(Ymaze_arena = paste0(Plate, "_", Arena)) %>%
-  # mutate(fly_id = paste(gsub('[A-Za-z0-9]+\\/([A-Za-z0-9_-]+)\\.csv', '\\1', data_files), arena, sep = "_"))
-  # mutate(fly_id = paste0(Datafile_ID, "_", Ymaze_arena)) %>% # not really necessary
-  # left_join(select(well_arena, Ymaze_arena, Plate48well), by = "Ymaze_arena") %>%
-  # mutate(Individuals_ID_well = paste0(Individuals_ID, "_", Plate48well)) %>%
-  # select(Datafile_ID, Individuals_ID, Individuals_ID_well, Ymaze_arena, time, Bin, Zone, t_zone)
+# mutate(Ymaze_arena = paste0(Plate, "_", Arena)) %>%
+# mutate(fly_id = paste(gsub('[A-Za-z0-9]+\\/([A-Za-z0-9_-]+)\\.csv', '\\1', data_files), arena, sep = "_"))
+# mutate(fly_id = paste0(Datafile_ID, "_", Ymaze_arena)) %>% # not really necessary
+# left_join(select(well_arena, Ymaze_arena, Plate48well), by = "Ymaze_arena") %>%
+# mutate(Individuals_ID_well = paste0(Individuals_ID, "_", Plate48well)) %>%
+# select(Datafile_ID, Individuals_ID, Individuals_ID_well, Ymaze_arena, time, Bin, Zone, t_zone)
 
 # split datafile into individual flies
 dat_an2 <- dat_an2 %>% split(., .[, "Individual_ID"])
@@ -336,13 +336,13 @@ dat_an2 <- dat_an2 %>% split(., .[, "Individual_ID"])
 dat_an2 <- dat_an2 %>%
   map(~ mutate(.x, Lag_zone = lag(Zone))) %>%
   map(~ mutate(.x, Turn = case_when(Lag_zone==1 & Zone==2 ~ 'L',
-                                  Lag_zone==1 & Zone==3 ~ 'R',
-                                  Lag_zone==2 & Zone==1 ~ 'R',
-                                  Lag_zone==2 & Zone==3 ~ 'L',
-                                  Lag_zone==3 & Zone==1 ~ 'L',
-                                  Lag_zone==3 & Zone==2 ~ 'R',
-                                  # lag_zone==zone ~ 'X', # this enables additional decision type = stay in the given zone
-                                  TRUE ~ NA_character_ ))) %>%
+                                    Lag_zone==1 & Zone==3 ~ 'R',
+                                    Lag_zone==2 & Zone==1 ~ 'R',
+                                    Lag_zone==2 & Zone==3 ~ 'L',
+                                    Lag_zone==3 & Zone==1 ~ 'L',
+                                    Lag_zone==3 & Zone==2 ~ 'R',
+                                    # lag_zone==zone ~ 'X', # this enables additional decision type = stay in the given zone
+                                    TRUE ~ NA_character_ ))) %>%
   map(~ select(.x, Datafile_ID, Individual_ID, Arena, time, Bin, Zone, t_zone, Turn))
 
 dat_an3 <- bind_rows(dat_an2)
@@ -517,7 +517,7 @@ binary_summary <- startles_only %>%
 
 startle_binary <- binary_summary %>%
   left_join(Session_data, by = 'Individual_ID')
-  
+
 write.table(startles_only, file = "./data/data_startle.csv", sep = ",", row.names = F)
 write.table(startles_only_act, file = "./data/data_startle_act.csv", sep = ",", row.names = F)
 write.table(startle_binary, file = "./data/data_startle_binary.csv", sep = ",", row.names = F)
@@ -587,10 +587,10 @@ Plotting treatment and sex effects
 ```{r 30_locomotion treatment and sex effects}
 
 data_summary <- function(x) {
-   m <- mean(x)
-   ymin <- m-sd(x)
-   ymax <- m+sd(x)
-   return(c(y=m,ymin=ymin,ymax=ymax))
+  m <- mean(x)
+  ymin <- m-sd(x)
+  ymax <- m+sd(x)
+  return(c(y=m,ymin=ymin,ymax=ymax))
 }
 
 data_locomotion_reduced<-subset(data_locomotion_reduced, select = -Comment)
@@ -603,7 +603,7 @@ plot1.4 <- na.omit(data_locomotion_reduced) %>%
   theme_classic() +
   scale_fill_brewer(palette = "Set1") +
   theme(legend.position = "none", axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), axis.text = element_text(size = 12))
-  
+
 
 plot1.4
 #red = female, blue = male
@@ -692,10 +692,10 @@ plot2.5
 # data_ymaze_reduced_long4 <- distinct(data_ymaze_reduced_long3)
 
 data_summary <- function(x) {
-   m <- mean(x)
-   ymin <- m-sd(x)
-   ymax <- m+sd(x)
-   return(c(y=m,ymin=ymin,ymax=ymax))
+  m <- mean(x)
+  ymin <- m-sd(x)
+  ymax <- m+sd(x)
+  return(c(y=m,ymin=ymin,ymax=ymax))
 }
 
 data_ymaze_reduced_long_trigramtype$Type<-as.factor(data_ymaze_reduced_long_trigramtype$Type)
@@ -964,7 +964,7 @@ summary(m3a)
 
 ```{r startle mean effect}
 m5 <- lmer(log(distance +1) ~ Sex*Treatment + (1|Batch) + (startle_number|Individual_ID),
-               data = data_startle_act_reduced)
+           data = data_startle_act_reduced)
 #boundary fit is singular
 summary(m5)
 Anova(m5)
@@ -1019,7 +1019,7 @@ data_loco_ymaze <- left_join(data_locomotion_reduced, data_ymaze_reduced_long, b
   group_by(ID) %>%
   mutate(avg_loco = mean(arena_distance)) %>%
   select(ID, reps, alter, partial, Sex.x, Treatment.x, avg_loco) %>%
- distinct()
+  distinct()
 ```
 
 #### Reps
@@ -1100,7 +1100,7 @@ data_loco_startle <- left_join(data_locomotion_reduced, data_startle_act_reduced
 cor.test(data_loco_startle$avg_startle, data_loco_startle$avg_loco)
 
 #could do a simple t test between the different treatments since we get the correlation and SE. Just look at between treatment and between sex. 
-  
+
 ```
 
 ```{r loco startle}
@@ -1124,4 +1124,54 @@ p3c <- ggplot(na.omit(data_loco_startle), x = log(avg_startle), y = log(avg_loco
 p3 <- (p3a/p3b/p3c)
 p3
 
+```
+
+
+## Example analysis of correlation heterogeneity
+
+### Locomotion & Y-maze data
+
+```{r}
+library(MCMCglmm)
+
+glimpse(data_loco_ymaze)
+
+# simple model with only corss-trait covariances
+# note - to get correlations Cov_1,2/sqrt(Var_1 * Var_2)
+model_cor1 <- MCMCglmm(cbind(reps, alter, avg_loco) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait):units,
+                       family = c("gaussian", "gaussian", "gaussian"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze),
+                       prior = list(R = list(V = diag(3), nu = 2.002)))
+
+plot(model_cor1$Sol)
+plot(model_cor1$VCV)
+autocorr.plot(model_cor1$VCV)
+summary(model_cor1)
+# quick way to get posteriors of correlations instead of covariances
+summary(posterior.cor(model_cor1$VCV))
+
+# block-diagonal model with correlations varying between exp groups
+model_cor2 <- MCMCglmm(cbind(reps, alter, avg_loco) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait:at.level(Treatment.x, "GS")):units +
+                         us(trait:at.level(Treatment.x, "GM")):units + 
+                         us(trait:at.level(Treatment.x, "I")):units,
+                       family = c("gaussian", "gaussian", "gaussian"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze),
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002),
+                                             R3 = list(V = diag(3), nu = 2.002))))
+
+plot(model_cor2$Sol)
+plot(model_cor2$VCV)
+autocorr.plot(model_cor2$VCV)
+
+# GS
+summary(posterior.cor(model_cor2$VCV[,1:9]))
+# GM
+summary(posterior.cor(model_cor2$VCV[,10:18]))
+# I
+summary(posterior.cor(model_cor2$VCV[,19:27]))
 ```
