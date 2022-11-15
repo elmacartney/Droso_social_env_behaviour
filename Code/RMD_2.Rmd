@@ -43,6 +43,7 @@ data_ymaze <- read.csv(here("Data/data_ymaze.csv")) #not that this still has the
 data_startle_act <- read.csv(here("Data/data_startle_act.csv")) #no startles removed
 data_startle <- read.csv(here("Data/data_startle.csv")) 
 
+data_startle_binary <- read.csv(here("Data/data_startle_binary.csv")) #binary if the flies moved at all during the assay
 
 Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
 ```
@@ -536,11 +537,13 @@ data_ymaze_reduced <- droplevels(data_ymaze[!data_ymaze$Exclude_mean == 'exclude
 
 data_startle_act_reduced <- droplevels(data_startle_act[!data_startle_act$Exclude_mean == 'exclude',])
 
+data_startle_binary_reduced <- droplevels(data_startle_binary[!data_startle_binary$Exclude_mean == 'exclude',])
+
 #getting N
 n_distinct(data_locomotion_reduced$Individual_ID)
 n_distinct(data_ymaze_reduced$Individual_ID)
-n_distinct(data_startle_act_reduced$Individual_ID) #why is this soooo low???
-
+n_distinct(data_startle_act_reduced$Individual_ID) #this is super low because many flies did not move across each of the three startles
+n_distinct(data_startle_binary_reduced$Individual_ID)
 ```
 
 ## Visualisations {.tabset}
@@ -1006,6 +1009,24 @@ print(rept)
 0 /(0.134 + 0+ 0.708 + 0.07)*100
 
 anova(m6b,m6c)
+
+```
+
+Binary analysis
+
+```{r}
+#Used to see if there is a difference between treatments in if the flies moved or not
+data_startle_binary_reduced$Sex <- as.factor(data_startle_binary_reduced$Sex)
+data_startle_binary_reduced$Treatment <- as.factor(data_startle_binary_reduced$Treatment)
+
+m6d <- glmer(startle_binary~Sex*Treatment + (1|Batch), family = binomial, data = data_startle_binary_reduced) #far more isolated flies were startled
+Anova(m6d)
+summary(m6d)
+
+#viewing contrast beteween I and GS
+
+m6e <-glmer(startle_binary~ Sex*relevel(factor(Treatment), ref = "GS") + (1|Batch), family = binomial, data = data_startle_binary_reduced)
+summary(m6e)
 
 ```
 
