@@ -29,6 +29,7 @@ library(readxl)
 library(patchwork)
 library(car)
 library(rptR)
+library(MCMCglmm)
 ```
 
 ## Loading data
@@ -1035,7 +1036,18 @@ summary(m6e)
 ### Locomotion and ymaze
 
 ```{r joining loco ymaze}
-data_loco_ymaze <- left_join(data_locomotion_reduced, data_ymaze_reduced_long, by = 'ID') %>% 
+
+#exluding the flies we lost track of during transfer so may have been in wrong well/ymaze
+data_locomotion_reduced$Exclude_correlation <- as.factor(data_locomotion_reduced$Exclude_correlation)
+
+data_locomotion_reduced2 <- droplevels(data_locomotion_reduced[!data_locomotion_reduced$Exclude_correlation == 'exclude',])
+
+data_ymaze_reduced_long$Exclude_correlation <- as.factor(data_ymaze_reduced_long$Exclude_correlation)
+
+data_ymaze_reduced_long2 <- droplevels(data_ymaze_reduced_long[!data_ymaze_reduced_long$Exclude_correlation == 'exclude',])
+
+#joining datasets
+data_loco_ymaze <- left_join(data_locomotion_reduced2, data_ymaze_reduced_long2, by = 'ID') %>% 
   select(ID, arena_distance, reps, alter, partial, Sex.x, Treatment.x) %>%
   group_by(ID) %>%
   mutate(avg_loco = mean(arena_distance)) %>%
@@ -1172,6 +1184,8 @@ autocorr.plot(model_cor1$VCV)
 summary(model_cor1)
 # quick way to get posteriors of correlations instead of covariances
 summary(posterior.cor(model_cor1$VCV))
+HPDinterval(posterior.cor(model_cor1$VCV))
+colMeans(posterior.cor(model_cor1$VCV))
 
 # block-diagonal model with correlations varying between exp groups
 model_cor2 <- MCMCglmm(cbind(reps, alter, avg_loco) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
@@ -1195,4 +1209,150 @@ summary(posterior.cor(model_cor2$VCV[,1:9]))
 summary(posterior.cor(model_cor2$VCV[,10:18]))
 # I
 summary(posterior.cor(model_cor2$VCV[,19:27]))
+
+model_cor2 <- MCMCglmm(cbind(reps, alter, avg_loco) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait:at.level(Sex.x, "M")):units +
+                         us(trait:at.level(Sex.x, "F")):units,
+                       family = c("poisson", "poisson", "gaussian"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze),
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002))))
+
+
+```
+
+## Correlation analysis for manuscipt
+
+```{r joining data}
+
+#exluding the flies we lost track of during transfer so may have been in wrong well/ymaze
+data_locomotion_reduced$Exclude_correlation <- as.factor(data_locomotion_reduced$Exclude_correlation)
+
+data_locomotion_reduced2 <- droplevels(data_locomotion_reduced[!data_locomotion_reduced$Exclude_correlation == 'exclude',])
+
+data_ymaze_reduced_long$Exclude_correlation <- as.factor(data_ymaze_reduced_long$Exclude_correlation)
+
+data_ymaze_reduced_long2 <- droplevels(data_ymaze_reduced_long[!data_ymaze_reduced_long$Exclude_correlation == 'exclude',])
+
+data_startle_binary_reduced$Exclude_correlation <- as.factor(data_startle_binary_reduced$Exclude_correlation)
+
+data_startle_binary_reduced2 <- droplevels(data_startle_binary_reduced[!data_startle_binary_reduced$Exclude_correlation == 'exclude',])
+
+#joining datasets
+data_loco_ymaze <- left_join(data_locomotion_reduced2, data_ymaze_reduced_long2, by = 'ID') %>% 
+  select(ID, arena_distance, reps, alter, partial, Sex.x, Treatment.x) %>%
+  group_by(ID) %>%
+  mutate(avg_loco = mean(arena_distance)) %>%
+  select(ID, reps, alter, partial, Sex.x, Treatment.x, avg_loco) %>%
+  distinct()
+
+data_loco_ymaze_startle <- left_join(data_loco_ymaze, data_startle_binary_reduced2, by = 'ID') %>% 
+  select(ID, avg_loco, reps, alter, partial, Sex.x, Treatment.x,startle_binary) %>%
+  group_by(ID) %>%
+  distinct()
+
+
+```
+
+### Model across treatment and sex
+
+```{r}
+
+#TODO priors need to be changes so model outputs will be altered
+
+model_cor1 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait):units,
+                       family = c("gaussian", "categorical", "poisson"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze_startle),
+                       prior = list(R = list(V = diag(3), nu = 2.002)))
+
+summary(posterior.cor(model_cor1$VCV))
+HPDinterval(posterior.cor(model_cor1$VCV))
+colMeans(posterior.cor(model_cor1$VCV))
+
+#creating dataframe 
+
+means <- colMeans(posterior.cor(model_cor1$VCV))
+summary <- as.data.frame(HPDinterval(posterior.cor(model_cor1$VCV)))
+summary$mean <- means
+summary<-head(summary, 3)
+summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+
+
+#plotting
+
+plot <- summary %>%
+  ggplot(aes(x = assay, y = mean)) +
+  geom_errorbar(aes(
+    ymin = lower,
+    ymax = upper ,
+    width = 1,
+    size = 1
+  )) +
+  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  ylim(-0.2, 2.5) + labs(x = 'Assay correlations',
+                         y = 'Posterior mean',
+                         title = "Overall model across treatment and sex") +
+  theme(legend.position = "none",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )  
+
+ plot
+
+```
+
+### Split by treatment
+
+```{r,}
+
+data_loco_ymaze_startle$Treatment.x <- as.factor(data_loco_ymaze_startle$Treatment.x)
+
+model_cor2 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait:at.level(Treatment.x, "GS")):units +
+                         us(trait:at.level(Treatment.x, "GM")):units + 
+                         us(trait:at.level(Treatment.x, "I")):units,
+                       family = c("gaussian", "categorical", "poisson"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze_startle),
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002),
+                                             R3 = list(V = diag(3), nu = 2.002))))
+
+
+
+# GS
+summary(posterior.cor(model_cor2$VCV[,1:9]))
+
+# GM
+summary(posterior.cor(model_cor2$VCV[,10:18]))
+
+# I
+summary(posterior.cor(model_cor2$VCV[,19:27]))
+
+#need to join in wide format then change to long format
+
+
+
+```
+
+### Split by sex
+
+```{r,}
+
+data_loco_ymaze_startle$Sex.x <- as.factor(data_loco_ymaze_startle)
+
+model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait:at.level(Sex.x, "M")):units +
+                         us(trait:at.level(Sex.x, "F")):units,
+                       family = c("gaussian", "categorical", "poisson"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze_startle),
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002))))
+
+
 ```
