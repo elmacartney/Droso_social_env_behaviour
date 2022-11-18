@@ -1292,7 +1292,7 @@ plot <- summary %>%
     size = 1
   )) +
   geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
-  ylim(-0.2, 2.5) + labs(x = 'Assay correlations',
+  ylim(-1, 1) + labs(x = 'Assay correlations',
                          y = 'Posterior mean',
                          title = "Overall model across treatment and sex") +
   theme(legend.position = "none",
@@ -1333,9 +1333,62 @@ summary(posterior.cor(model_cor2$VCV[,10:18]))
 # I
 summary(posterior.cor(model_cor2$VCV[,19:27]))
 
-#need to join in wide format then change to long format
+#GS summary
+GS_means <- colMeans(posterior.cor(model_cor2$VCV[,1:9]))
+GS_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,1:9])))
+GS_summary$mean <- GS_means
+GS_summary<-head(GS_summary, 3)
+GS_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+GS_summary$treatment <- c("GS", "GS", "GS")
+
+#GM summary
+GM_means <- colMeans(posterior.cor(model_cor2$VCV[,10:18]))
+GM_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,10:18])))
+GM_summary$mean <- GM_means
+GM_summary<-head(GM_summary, 3)
+GM_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+GM_summary$treatment <- c("GM", "GM", "GM")
+
+#I summary
+I_means <- colMeans(posterior.cor(model_cor2$VCV[,10:18]))
+I_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,10:18])))
+I_summary$mean <- I_means
+I_summary<-head(GM_summary, 3)
+I_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+I_summary$treatment <- c("I", "I", "I")
+
+treatment_merged <- rbind(I_summary, GS_summary,GM_summary)
+
+treatment_merged$assay<-as.factor(treatment_merged$assay)
+treatment_merged$treatment<-as.factor(treatment_merged$treatment)
 
 
+#plotting
+
+plot1 <- treatment_merged %>%
+  ggplot(aes(x = assay, y = mean, col = treatment)) +
+  geom_errorbar(aes(
+    ymin = lower,
+    ymax = upper,
+    width = 1,
+    size = 1), 
+    position = position_dodge(1)
+  ) +
+  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  scale_colour_brewer(palette = "Dark2") +
+  ylim(-1,1) + labs(x = 'Assay correlations',
+                         y = 'Posterior mean',
+                         col = 'Treatment',
+                         title = "Correlations based on treatment",
+                         legend_position = "none") +
+  theme(
+   legend.position = "none",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )  
+
+ plot1
 
 ```
 
@@ -1343,7 +1396,7 @@ summary(posterior.cor(model_cor2$VCV[,19:27]))
 
 ```{r,}
 
-data_loco_ymaze_startle$Sex.x <- as.factor(data_loco_ymaze_startle)
+data_loco_ymaze_startle$Sex.x <- as.factor(data_loco_ymaze_startle$Sex.x)
 
 model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait:at.level(Sex.x, "M")):units +
@@ -1354,5 +1407,68 @@ model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trai
                        prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
                                              R2 = list(V = diag(3), nu = 2.002))))
 
+# Males
+summary(posterior.cor(model_cor3$VCV[,1:9]))
 
+# Females
+summary(posterior.cor(model_cor3$VCV[,10:18]))
+
+
+#Males summary
+M_means <- colMeans(posterior.cor(model_cor3$VCV[,1:9]))
+M_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor3$VCV[,1:9])))
+M_summary$mean <- M_means
+M_summary<-head(M_summary, 3)
+M_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+M_summary$sex <- c("male", "male", "male")
+
+#GM summary
+F_means <- colMeans(posterior.cor(model_cor3$VCV[,10:18]))
+F_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor3$VCV[,10:18])))
+F_summary$mean <- F_means
+F_summary<-head(F_summary, 3)
+F_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+F_summary$sex <- c("female", "female", "female")
+
+
+sex_merged <- rbind(M_summary, F_summary)
+
+sex_merged$assay<-as.factor(sex_merged$assay)
+sex_merged$sex<-as.factor(sex_merged$sex)
+
+#plotting
+
+plot2 <- sex_merged %>%
+  ggplot(aes(x = assay, y = mean, col = sex)) +
+  geom_errorbar(aes(
+    ymin = lower,
+    ymax = upper,
+    width = 1,
+    size = 1), 
+    position = position_dodge(1)
+  ) +
+  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  scale_color_brewer(palette = "Set1") +
+  ylim(-1,1) + labs(x = 'Assay correlations',
+                         y = 'Posterior mean',
+                         col = 'Treatment',
+                         title = "Correlations based on sex",
+                         legend_position = "none") +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )  
+
+ plot2
+ 
+```
+
+### Joining plots
+
+```{r,}
+plots <- plot / (plot1 + plot2)
+
+plots
 ```
