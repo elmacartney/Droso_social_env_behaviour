@@ -1261,9 +1261,9 @@ data_loco_ymaze_startle <- left_join(data_loco_ymaze, data_startle_binary_reduce
 
 #TODO priors need to be changes so model outputs will be altered
 
-model_cor1 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+model_cor1 <- MCMCglmm(cbind(avg_loco, reps, startle_binary) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait):units,
-                       family = c("gaussian", "categorical", "poisson"),
+                       family = c("gaussian", "poisson", "gaussian"),
                        nitt = 100000, burnin = 20000, thin = 80,
                        data = as.data.frame(data_loco_ymaze_startle),
                        prior = list(R = list(V = diag(3), nu = 2.002)))
@@ -1311,16 +1311,16 @@ plot <- summary %>%
 
 data_loco_ymaze_startle$Treatment.x <- as.factor(data_loco_ymaze_startle$Treatment.x)
 
-model_cor2 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+model_cor2 <- MCMCglmm(cbind(startle_binary,avg_loco, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait:at.level(Treatment.x, "GS")):units +
                          us(trait:at.level(Treatment.x, "GM")):units + 
                          us(trait:at.level(Treatment.x, "I")):units,
-                       family = c("gaussian", "categorical", "poisson"),
+                       family = c("categorical", "gaussian", "poisson"),
                        nitt = 100000, burnin = 20000, thin = 80,
                        data = as.data.frame(data_loco_ymaze_startle),
-                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
-                                             R2 = list(V = diag(3), nu = 2.002),
-                                             R3 = list(V = diag(3), nu = 2.002))))
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002, fix = 1),
+                                             R2 = list(V = diag(3), nu = 2.002, fix = 1),
+                                             R3 = list(V = diag(3), nu = 2.002, fix = 1))))
 
 
 
