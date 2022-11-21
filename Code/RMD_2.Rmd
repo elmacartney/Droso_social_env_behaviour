@@ -1277,8 +1277,8 @@ colMeans(posterior.cor(model_cor1$VCV))
 means <- colMeans(posterior.cor(model_cor1$VCV))
 summary <- as.data.frame(HPDinterval(posterior.cor(model_cor1$VCV)))
 summary$mean <- means
-summary<-head(summary, 3)
-summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+summary<-summary[c(2,3,6),]
+summary$assay <- c("loco~reps", "loco~startle", "startle~reps")
 
 
 #plotting
@@ -1292,16 +1292,17 @@ plot <- summary %>%
     size = 1
   )) +
   geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
-  ylim(-1, 1) + labs(x = 'Assay correlations',
+  ylim(-0.5, 0.5) + labs(x = 'Assay correlations',
                          y = 'Posterior mean',
                          title = "Overall model across treatment and sex") +
   theme(legend.position = "none",
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14),
-    axis.text = element_text(size = 12)
-  )  
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text = element_text(size = 12)
+  ) +
+  geom_hline(yintercept = 0, colour = 'red', lty = 2)
 
- plot
+plot
 
 ```
 
@@ -1315,12 +1316,12 @@ model_cor2 <- MCMCglmm(cbind(startle_binary,avg_loco, reps) ~ -1 + trait + trait
                        rcov = ~us(trait:at.level(Treatment.x, "GS")):units +
                          us(trait:at.level(Treatment.x, "GM")):units + 
                          us(trait:at.level(Treatment.x, "I")):units,
-                       family = c("categorical", "gaussian", "poisson"),
+                       family = c("gaussian", "gaussian", "poisson"),
                        nitt = 100000, burnin = 20000, thin = 80,
                        data = as.data.frame(data_loco_ymaze_startle),
-                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002, fix = 1),
-                                             R2 = list(V = diag(3), nu = 2.002, fix = 1),
-                                             R3 = list(V = diag(3), nu = 2.002, fix = 1))))
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002),
+                                             R3 = list(V = diag(3), nu = 2.002))))
 
 
 
@@ -1337,24 +1338,24 @@ summary(posterior.cor(model_cor2$VCV[,19:27]))
 GS_means <- colMeans(posterior.cor(model_cor2$VCV[,1:9]))
 GS_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,1:9])))
 GS_summary$mean <- GS_means
-GS_summary<-head(GS_summary, 3)
-GS_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+GS_summary<-GS_summary[c(2,3,6),]
+GS_summary$assay <- c("loco~startle", "startle~reps", "loco~reps")
 GS_summary$treatment <- c("GS", "GS", "GS")
 
 #GM summary
 GM_means <- colMeans(posterior.cor(model_cor2$VCV[,10:18]))
 GM_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,10:18])))
 GM_summary$mean <- GM_means
-GM_summary<-head(GM_summary, 3)
-GM_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+GM_summary<-GM_summary[c(2,3,6),]
+GM_summary$assay <- c("loco~startle", "startle~reps", "loco~reps")
 GM_summary$treatment <- c("GM", "GM", "GM")
 
 #I summary
-I_means <- colMeans(posterior.cor(model_cor2$VCV[,10:18]))
-I_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,10:18])))
+I_means <- colMeans(posterior.cor(model_cor2$VCV[,19:27]))
+I_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,19:27])))
 I_summary$mean <- I_means
-I_summary<-head(GM_summary, 3)
-I_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
+I_summary<-I_summary[c(2,3,6),]
+I_summary$assay <- c("loco~startle", "startle~reps", "loco~reps")
 I_summary$treatment <- c("I", "I", "I")
 
 treatment_merged <- rbind(I_summary, GS_summary,GM_summary)
@@ -1369,26 +1370,27 @@ plot1 <- treatment_merged %>%
   ggplot(aes(x = assay, y = mean, col = treatment)) +
   geom_errorbar(aes(
     ymin = lower,
-    ymax = upper,
+    ymax = upper), 
     width = 1,
-    size = 1), 
+    size = 1,
     position = position_dodge(1)
   ) +
-  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  geom_point(position = position_dodge(1), size = 5) + theme_classic() +
   scale_colour_brewer(palette = "Dark2") +
-  ylim(-1,1) + labs(x = 'Assay correlations',
-                         y = 'Posterior mean',
-                         col = 'Treatment',
-                         title = "Correlations based on treatment",
-                         legend_position = "none") +
+  ylim(-0.5,0.5) + labs(x = 'Assay correlations',
+                        y = 'Posterior mean',
+                        col = 'Treatment',
+                        title = "Correlations based on treatment",
+                        legend_position = "none") +
   theme(
-   legend.position = "none",
+    legend.position = "bottom",
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     axis.text = element_text(size = 12)
-  )  
+  )  +
+  geom_hline(yintercept = 0, colour = 'red', lty = 2)
 
- plot1
+plot1
 
 ```
 
@@ -1401,7 +1403,7 @@ data_loco_ymaze_startle$Sex.x <- as.factor(data_loco_ymaze_startle$Sex.x)
 model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait:at.level(Sex.x, "M")):units +
                          us(trait:at.level(Sex.x, "F")):units,
-                       family = c("gaussian", "categorical", "poisson"),
+                       family = c("gaussian", "gaussian", "poisson"),
                        nitt = 100000, burnin = 20000, thin = 80,
                        data = as.data.frame(data_loco_ymaze_startle),
                        prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
@@ -1418,7 +1420,7 @@ summary(posterior.cor(model_cor3$VCV[,10:18]))
 M_means <- colMeans(posterior.cor(model_cor3$VCV[,1:9]))
 M_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor3$VCV[,1:9])))
 M_summary$mean <- M_means
-M_summary<-head(M_summary, 3)
+M_summary<-M_summary[c(2,3,6), ]
 M_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
 M_summary$sex <- c("male", "male", "male")
 
@@ -1426,7 +1428,7 @@ M_summary$sex <- c("male", "male", "male")
 F_means <- colMeans(posterior.cor(model_cor3$VCV[,10:18]))
 F_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor3$VCV[,10:18])))
 F_summary$mean <- F_means
-F_summary<-head(F_summary, 3)
+F_summary<-F_summary[c(2,3,6),]
 F_summary$assay <- c("loco~startle", "loco~reps", "startle~reps")
 F_summary$sex <- c("female", "female", "female")
 
@@ -1442,27 +1444,27 @@ plot2 <- sex_merged %>%
   ggplot(aes(x = assay, y = mean, col = sex)) +
   geom_errorbar(aes(
     ymin = lower,
-    ymax = upper,
+    ymax = upper),
     width = 1,
-    size = 1), 
+    size = 1,
     position = position_dodge(1)
   ) +
-  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  geom_point(position = position_dodge(1), size = 5) + theme_classic() +
   scale_color_brewer(palette = "Set1") +
   ylim(-1,1) + labs(x = 'Assay correlations',
-                         y = 'Posterior mean',
-                         col = 'Treatment',
-                         title = "Correlations based on sex",
-                         legend_position = "none") +
+                    y = 'Posterior mean',
+                    col = 'Treatment',
+                    title = "Correlations based on sex",
+                    legend_position = "none") +
   theme(
-    legend.position = "none",
+    legend.position = "bottom",
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     axis.text = element_text(size = 12)
   )  
 
- plot2
- 
+plot2
+
 ```
 
 ### Joining plots
