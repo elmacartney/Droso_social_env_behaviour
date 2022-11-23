@@ -1259,8 +1259,6 @@ data_loco_ymaze_startle <- left_join(data_loco_ymaze, data_startle_binary_reduce
 
 ```{r}
 
-#TODO priors need to be changes so model outputs will be altered
-
 model_cor1 <- MCMCglmm(cbind(avg_loco, reps, startle_binary) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait):units,
                        family = c("gaussian", "poisson", "gaussian"),
@@ -1283,6 +1281,7 @@ summary$assay <- c("loco~reps", "loco~startle", "startle~reps")
 
 #plotting
 
+#TODO change order of correlations on x axis to match order of reporting in Table 2
 plot <- summary %>%
   ggplot(aes(x = assay, y = mean)) +
   geom_errorbar(aes(
