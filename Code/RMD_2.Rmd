@@ -805,7 +805,7 @@ data_startle_act_reduced<-subset(data_startle_act_reduced, select = -Comment)
 data_startle_act_reduced$startle_number<- as.factor(data_startle_act_reduced$startle_number)
 data_startle_act_reduced$Treatment<- as.factor(data_startle_act_reduced$Treatment)
 
-hist(data_startle_act_reduced$distance)
+# hist(data_startle_act_reduced$distance)
 data_startle_act_reduced$log_distance <-log(data_startle_act_reduced$distance+1)
 
 hist(data_startle_act_reduced$log_distance)
@@ -1060,7 +1060,6 @@ data_loco_ymaze <- left_join(data_locomotion_reduced2, data_ymaze_reduced_long2,
 ```{r locomotion_reps}
 #not including treatment as there was no effect of treatment on
 
-#TODO check if we need to remove any individuals 
 p1a <- ggplot(na.omit(data_loco_ymaze), x = reps, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x) +
   geom_point(aes(x = reps, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) + 
   geom_smooth(method = lm, aes(x = reps, y = log(avg_loco+1), color = Treatment.x, shape = Sex.x)) +
