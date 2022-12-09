@@ -558,6 +558,7 @@ GS = Group, single sex
 
 Plotting average locomotion and individual differences
 ```{r 29_locomotion average effects, warning=FALSE}
+
 data_locomotion_avg <-data_locomotion_reduced %>%
   group_by(Individual_ID) %>%
   summarise(avg = mean(arena_distance))
@@ -611,6 +612,14 @@ plot1.4 <- na.omit(data_locomotion_reduced) %>%
 
 plot1.4
 #red = female, blue = male
+
+sample_size1 <- data_locomotion_reduced %>%
+  select(Individual_ID, Treatment, Sex) %>%
+  unique() %>%
+  group_by (Treatment, Sex) %>%
+  summarise(n = n())
+
+sample_size1
 ```
 
 ### Ymaze
@@ -621,6 +630,7 @@ Distribution of trigrams
 
 data_ymaze_reduced_long <- data_ymaze_reduced %>%
   pivot_longer(cols = c('LLL', 'LLR', 'LRL','LRR', 'RLL', 'RLR', 'RRL', 'RRR'), names_to = "Trigram", values_to = "Count")
+
 
 plot2.1 <- data_ymaze_reduced_long %>%
   # filter(n > 0) %>%
@@ -657,40 +667,45 @@ Treatment and Sex effects all trigrams
 
 data_ymaze_reduced_long$Treatment<-as.factor(data_ymaze_reduced_long$Treatment)
 
+data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>%
+  select(reps, alter, partial, Individual_ID, Sex, Treatment) %>%
+  unique()
+
+
 #males
-plot2.3 <- data_ymaze_reduced_long %>%
-  filter(Sex == "M") %>%
-  ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
-  geom_col() +
-  ylim(0,7000) +
-  theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Males') +
-  theme(text = element_text(size = 15), legend.position = "none") 
-
-plot2.2 <- data_ymaze_reduced_long_trigramtype %>%
-  ggplot(aes(x = Type, y = Count_type)) +
-  geom_col(position = "stack") +
-  theme_classic() + theme(text = element_text(size = 15)) +
-  labs(x = "Trigram type", y = 'Count')
-
-
-
-#females
-plot2.4 <- data_ymaze_reduced_long %>%
-  filter(Sex == "F") %>%
-  ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
-  geom_col()  +
-  ylim(0,7000) +
-  theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Females') +
-  theme( text = element_text(size = 15))
-plot2.5 <- (plot2.3 + plot2.4)
-plot2.5
-
-
+# plot2.3 <- data_ymaze_reduced_long2 %>%
+#   filter(Sex == "M") %>%
+#   ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
+#   geom_col() +
+#   ylim(0,7000) +
+#   theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Males') +
+#   theme(text = element_text(size = 15), legend.position = "none") 
+# 
+# plot2.2 <- data_ymaze_reduced_long_trigramtype %>%
+#   ggplot(aes(x = Type, y = Count_type)) +
+#   geom_col(position = "stack") +
+#   theme_classic() + theme(text = element_text(size = 15)) +
+#   labs(x = "Trigram type", y = 'Count')
+# 
+# 
+# 
+# #females
+# plot2.4 <- data_ymaze_reduced_long %>%
+#   filter(Sex == "F") %>%
+#   ggplot(aes(x = Trigram, y = Count, fill = Treatment)) +
+#   geom_col()  +
+#   ylim(0,7000) +
+#   theme_classic() + labs(x = 'Trigram', y = 'Total count', title = 'Females') +
+#   theme( text = element_text(size = 15))
+# plot2.5 <- (plot2.3 + plot2.4)
+# plot2.5
+# 
+# 
 # data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>% pivot_longer(
 #     cols = c('reps', 'alter'),
 #     names_to = "Type",
-#     values_to = "Count_type")
-
+#     values_to = "Count_type"))
+# 
 # data_ymaze_reduced_long3 <- data_ymaze_reduced_long2 [c("Individual_ID", "Sex", "Type","Treatment", "Count_type")]
 # 
 # data_ymaze_reduced_long4 <- distinct(data_ymaze_reduced_long3)
@@ -762,14 +777,15 @@ data_ymaze_reduced_long_trigramtype$Sex<-as.factor(data_ymaze_reduced_long_trigr
 #   scale_fill_brewer(palette = "Set1") 
 
 
-plot2.12 <- na.omit(data_ymaze_reduced_long4) %>%
-  filter(Type == "alter") %>%
-  ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) + geom_col(position = "stack")+
+plot2.12 <- na.omit(data_ymaze_reduced_long2) %>%
+  # filter(Type == "alter") %>%
+  ggplot(aes(x = Treatment, y = alter, fill = Sex)) + geom_col(position = "stack")+
   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
   labs(x = "Treatment", y = 'Count', title = 'Alternations') +
   scale_fill_brewer(palette = "Set1") +
   ylim(0,10000)
 
+plot2.12
 
 # plot2.13 <- na.omit(data_ymaze_reduced_long4) %>%
 #   filter(Type == "reps") %>%
@@ -780,9 +796,9 @@ plot2.12 <- na.omit(data_ymaze_reduced_long4) %>%
 #   scale_fill_brewer(palette = "Set1") 
 
 
-plot2.13 <- na.omit(data_ymaze_reduced_long4) %>%
-  filter(Type == "reps") %>%
-  ggplot(aes(x = Treatment, y = Count_type, fill = Sex)) + geom_col(position = "stack") +
+plot2.13 <- na.omit(data_ymaze_reduced_long2) %>%
+  # filter(Type == "reps") %>%
+  ggplot(aes(x = Treatment, y = reps, fill = Sex)) + geom_col(position = "stack") +
   theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
   labs(x = "Treatment", y = 'Count', title = 'Repetitions') +
   scale_fill_brewer(palette = "Set1") +
@@ -792,6 +808,15 @@ plot2.13 <- na.omit(data_ymaze_reduced_long4) %>%
 
 plot2.14 <- (plot2.12 + plot2.13) 
 plot2.14 # red = female, blue = male
+
+
+sample_size3 <- data_ymaze_reduced_long2 %>%
+  group_by (Treatment, Sex) %>%
+  summarise(n = n())
+
+sample_size3
+
+
 ```
 
 ### Startle
@@ -876,6 +901,14 @@ plot3.4 <- ggplot(data=data_startle_act_reduced, aes(x = startle_number, y = dis
   theme(strip.text.x = element_blank(), text = element_text(size = 15)) +
   labs(x = 'Startle number', y = 'Total distance travelled')
 plot3.4
+
+
+
+sample_size4 <- data_ymaze_reduced_long2 %>%
+  group_by (Treatment, Sex) %>%
+  summarise(n = n())
+
+sample_size4
 ```
 
 ## Mean models {.tabset}
@@ -917,6 +950,7 @@ anova(m, m2) %>% kbl() %>% kable_material(c("striped"))
 # model: variance between rounds, individuals and batches, fixed effect of sex and assay date
 # data_ymaze_reduced_long2 <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type")
 
+
 m <- glmer(Count_type~ Type*Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
 Anova(m)
 
@@ -924,6 +958,7 @@ ma <- glmer(Count_type~ Type + (1|Individual_ID) + (1|Batch), family = poisson, 
 Anova(ma)
 summary(ma)
 
+#TODO not sure if this is correct since we have repetitions of data
 m3 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
 summary(m3)
 
@@ -936,10 +971,10 @@ rept <- rpt(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("In
 print(rept)
 
 #individual_ID
-1.57 / (1.57 + 0.053 + 0.098 + 0.558)*100
+0.535 / (0.535 + 0.03 + 0.318 + 0.341)*100
 
 #batch
-0.053 / (1.57 + 0.053 + 0.098 + 0.558)*100
+0.03 / (1.57 + 0.053 + 0.098 + 0.558)*100
 
 
 m4 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
@@ -951,10 +986,14 @@ rept <- rpt(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Ind
 print(rept)
 
 #individual_ID
-1.936 / (1.936 + 0.106 + 0.025 + 1.156)*100
+0.454 / (0.454 + 0.065 + 0.766 + 0.875)*100
 
 
-0.106 / (1.936 + 0.106 + 0.025 + 1.156)*100
+0.065 / (0.454 + 0.065 + 0.766 + 0.875)*100
+
+m5 <-glmer(partial~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long)
+Anova(m5)
+
 
 
 # TODO adding models to see hidden contrasts
@@ -972,6 +1011,7 @@ m5 <- lmer(log(distance +1) ~ Sex*Treatment + (1|Batch) + (startle_number|Indivi
 #boundary fit is singular
 summary(m5)
 Anova(m5)
+
 
 
 ```
@@ -1028,6 +1068,13 @@ summary(m6d)
 
 m6e <-glmer(startle_binary~ Sex*relevel(factor(Treatment), ref = "GS") + (1|Batch), family = binomial, data = data_startle_binary_reduced)
 summary(m6e)
+
+
+sample_size2 <- data_startle_binary_reduced %>%
+  group_by (Treatment, Sex) %>%
+  summarise(n = n())
+
+sample_size2
 
 ```
 
@@ -1276,10 +1323,12 @@ means <- colMeans(posterior.cor(model_cor1$VCV))
 summary <- as.data.frame(HPDinterval(posterior.cor(model_cor1$VCV)))
 summary$mean <- means
 summary<-summary[c(2,3,6),]
-summary$assay <- c("loco~reps", "loco~startle", "startle~reps")
+summary$assay <- c("locomotion~repetitions", "locomotion~startle", "startle~repetitions")
 
 
 #plotting
+
+summary$assay <- as.factor(summary$assay)
 
 #TODO change order of correlations on x axis to match order of reporting in Table 2
 plot <- summary %>%
@@ -1292,14 +1341,13 @@ plot <- summary %>%
   )) +
   geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
   ylim(-0.5, 0.5) + labs(x = 'Assay correlations',
-                         y = 'Posterior mean',
-                         title = "Overall model across treatment and sex") +
+                         y = 'Posterior mean',) +
   theme(legend.position = "none",
         axis.title.x = element_text(size = 14),
         axis.title.y = element_text(size = 14),
         axis.text = element_text(size = 12)
   ) +
-  geom_hline(yintercept = 0, colour = 'red', lty = 2)
+  geom_hline(yintercept = 0, colour = 'red', lty = 2, size = 1)
 
 plot
 
@@ -1379,7 +1427,6 @@ plot1 <- treatment_merged %>%
   ylim(-0.5,0.5) + labs(x = 'Assay correlations',
                         y = 'Posterior mean',
                         col = 'Treatment',
-                        title = "Correlations based on treatment",
                         legend_position = "none") +
   theme(
     legend.position = "bottom",
@@ -1450,17 +1497,17 @@ plot2 <- sex_merged %>%
   ) +
   geom_point(position = position_dodge(1), size = 5) + theme_classic() +
   scale_color_brewer(palette = "Set1") +
-  ylim(-1,1) + labs(x = 'Assay correlations',
+  ylim(-0.5,0.5) + labs(x = 'Assay correlations',
                     y = 'Posterior mean',
                     col = 'Treatment',
-                    title = "Correlations based on sex",
                     legend_position = "none") +
   theme(
     legend.position = "bottom",
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     axis.text = element_text(size = 12)
-  )  
+  )  +
+  geom_hline(yintercept = 0, colour = 'red', lty = 2)
 
 plot2
 
@@ -1469,7 +1516,7 @@ plot2
 ### Joining plots
 
 ```{r,}
-plots <- plot / (plot1 + plot2)
+plots <- plot / (plot1 + plot2) + plot_annotation(tag_levels = 'A')
 
 plots
 ```
