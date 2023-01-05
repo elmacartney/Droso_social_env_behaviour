@@ -1,0 +1,774 @@
+---
+title: "Dmel Social Environment on Behaviour"
+author: "Erin Macartney"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::robobook:
+      code_folding: hide
+      toc_depth: 3
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## Setup {.tabset}
+
+### Packages
+
+```{r, message = F}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(here) # write out the path
+library(kableExtra)
+library(sjlabelled)
+library(ggpubr)
+library(rstatix)
+library(car)
+library(RColorBrewer)
+library(readxl)
+library(patchwork)
+library(car)
+library(rptR)
+library(MCMCglmm)
+```
+
+### Loading data
+
+```{r}
+#loading session data
+Session_data <- read_excel(here("Data/session_data/Session_data_extended.xlsx"))
+#loading already processed data
+data_locomotion <- read.csv(here("Data/data_locomotion.csv"))
+data_ymaze <- read.csv(here("Data/data_ymaze.csv")) #not that this still has the 15th ymaze included in dataset but this is removed through na.omit later
+data_startle_act <- read.csv(here("Data/data_startle_act.csv")) #no startles removed
+data_startle <- read.csv(here("Data/data_startle.csv")) #no startles remain
+data_startle_binary <- read.csv(here("Data/data_startle_binary.csv")) #binary if the flies moved at all during the assay
+
+Session_data$Individual_ID <- paste(Session_data$Assay_ID,Session_data$Position, sep = "_")
+```
+
+### Data processing {.tabset}
+
+#### Locomotion
+
+```{r, eval = FALSE}
+data_path <- here("Data/locomotion/")
+data_files <- list.files(here("Data/locomotion/"), recursive = T)
+
+#This loads all 24 files but we will only parse one data file for now
+data_files[1:24]
+```
+
+```{r, eval = FALSE}
+data_compiler <- function(filename, data_path) {
+  
+  ## ARG filename vector or list of file names to process (only files, no full paths)
+  ## ARG data_path text string with the path to access all files
+  ## ARG run_register database of all runs with datafile IDs and sexing IDs
+  
+  ## ARGS to develop: passing custom RE, custom wells to skip, custom columns to skip
+  
+  dat_temp <- readLines(paste(data_path, filename, sep = '/'))
+  
+  # file parsing
+  dat_temp_df <- read.csv(text = dat_temp, header = T, sep = ',',
+                          quote = '\"', dec = '.', skip = 4, nrows = length(dat_temp) - 4 - 2,
+                          stringsAsFactors = F)
+  
+  ## these line are design specific - for now the function has close form on those
+  ## possible to implement as additional argument
+  
+  dat_temp_df <- dat_temp_df[, -(2:6)]
+  dat_temp_df <- dat_temp_df %>% select(!(F3:F8))
+  
+  # extract headers
+  head_temp <- readLines(paste(data_path, filename, sep = '/'), n = 4)
+  
+  # using RE - this method is more flexible as the structure and location of ID can change
+  id_index <- grep('Subject Identification', head_temp)
+  run_id <- gsub('.*Subject Identification\\\",\"([A-Z]{1}[0-9]{3})\\\"', '\\1', head_temp[id_index])
+  dat_temp_df$Datafile_ID <- run_id
+  
+  # assay_date <- str_sub(run_id, 11, 16)
+  # dat_temp_df$date <- assay_date
+  
+  dat_temp_df <-
+    dat_temp_df %>%
+    pivot_longer(names_to = 'well_id', values_to = 'arena_distance', cols = matches('[A-H][1-9]')) %>%
+    rename(time = TIME, temperature = TEMPERATURE, round = ROUND,
+           variable = VARIABLE)
+  
+  dat_temp_df$Individual_ID <- paste(dat_temp_df$Datafile_ID, dat_temp_df$well_id, sep = "_")
+  
+  # dat_temp_df <- dat_temp_df %>%
+  #   left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
+  # 
+  # dat_temp_df <- dat_temp_df %>%
+  #   mutate(Individuals_ID_well = paste0(Individuals_ID, '_', Well_ID))
+  # 
+  # dat_temp_df$Filename <- filename
+  
+  dat_temp_df <- dat_temp_df %>% select(Individual_ID, Datafile_ID,
+                                        temperature, round, arena_distance)
+  
+  return(dat_temp_df)
+}
+```
+
+
+```{r, message = F, eval = FALSE}
+# Not run: test
+# data_compiler(data_files[1], data_path, run_register)
+
+data_locomotion <- map_dfr(data_files, ~ data_compiler(.x, data_path = data_path))
+
+length(unique(data_locomotion$Datafile_ID)) # should be 8 distinct files
+
+glimpse(data_locomotion)
+```
+
+```{r, eval = FALSE}
+# data_locomotion$Individual_ID <- paste(data_locomotion$Datafile_ID, data_locomotion$well_id, sep = "_")
+
+
+data_locomotion  <- data_locomotion%>%
+  left_join(Session_data, by = "Individual_ID")
+
+write.table(data_locomotion, file = "./Data/data_locomotion.csv", sep = ",", row.names = F)
+```
+
+#### Ymaze
+```{r, eval = FALSE}
+#First we load the y-maze data and tidy it up to separate summary data from zone changes data.
+## parse datafiles into a nested tibble
+data_path <- here('Data/ymaze/')
+data_files <- list.files(here('Data/ymaze/'), recursive = T)
+data_files[1:72]
+```
+
+```{r, eval = FALSE}
+#The below parser identifies lines in the dataset that directly relate to zone-switching data and extracts them, or (when `summary = TRUE`) it extracts the arena distances summaries from the bottom section of the file.
+
+#[EDIT] apparently read_delim no longer works with just vectors, now needs `I()`*
+
+# helper functions extracting the data rows and the header rows
+data_parser <- function(pattern, path, filename, summary = FALSE) {
+  dat_temp <- readLines(paste(path, filename, sep = '/'))
+  zone_change_index <- grep(pattern, dat_temp)
+  
+  if(summary == FALSE) {
+    return(read_delim(file = I(dat_temp[zone_change_index]), col_names = F, delim = ',',
+                      quote = '\"' # skip = 4, nrows = length(dat_temp) - 4 - 1)
+    ))
+  } else {
+    return(read_delim(file = I(dat_temp[-zone_change_index]), col_names = T, delim = ',',
+                      quote = '\"', skip = 6, n_max = 3))
+  }
+}
+
+# test the parser
+# here we simply check that the selected pattern to be looked for (`Arena`) is indeed present in the file.
+pattern1 <- "Arena" # defines what should contain each line that we look for
+test1 <- readLines(paste(data_path, data_files[1], sep = '/'))
+id_test <- grep(pattern1, test1) # use (simplified) RE to select lines
+```
+
+```{r, eval = FALSE}
+
+# [EDIT] apparently read_delim no longer works with just vectors, now needs `I()`
+# this extracts (messy) run and temporary data from each file
+test_dat <- read_delim(file = I(test1[-id_test]), col_names = T, delim = ',',
+                       quote = '\"', skip = 6, n_max = 3)
+
+# helper function that parses the (messy) run data into a readable format)
+head_parser <- function(path, filename) {
+  dat_temp <- readLines(paste(path, filename, sep = '/'), n = 4)
+  return(read_delim(file = I(dat_temp),
+                    delim = ',',
+                    col_names = F))
+}
+```
+
+```{r, eval = FALSE}
+# create tibble with raw data (nested: data and header nested under file names)
+dat_raw <- tibble(data_files = data_files) %>%
+  mutate(data = map(data_files, 
+                    ~ data_parser(pattern1,
+                                  data_path,
+                                  .x, summary = FALSE))) %>%
+  mutate(head = map(data_files, ~ head_parser(data_path, .x)))
+
+# this removes the redundant 'Arena' column
+dat_raw[[2]] <- dat_raw[[2]] %>%
+  map(~ select(.x, !c(X3)))
+
+# rename variables in sub-tibble based on their real content
+dat_raw[[2]] <- dat_raw[[2]] %>%
+  map(~ rename(.x, time = X1, Info = X2, Arena = X4, Action = X5, Zone_no = X6))
+
+# reformat the head sub-tibble
+dat_raw[[3]] <- dat_raw[[3]] %>%
+  map(~ pivot_wider(.x, names_from = X3, values_from = X4)) %>%
+  map(~ rename(.x, Datafile_ID = `Subject Identification`)) %>%
+  map(~ select(.x, Apparatus, Datafile_ID))
+
+# check the modifications
+dat_raw[[2]][[1]]
+dat_raw[[3]][[1]]
+```
+
+```{r, eval = FALSE}
+
+# Below code is used to  extract and organise arena summaries - this data is not very useful as it only represents time/distance totals in each of an arena's zones.
+# parse summary data from a file into a separate tibble - this is not used for now
+# processed only for consistency
+dat_raw_summ <- tibble(data_files = data_files) %>%
+  mutate(data = map(data_files, ~ data_parser(pattern1,
+                                              data_path,
+                                              .x,
+                                              summary = T)))
+dat_raw_summ[[2]] <- dat_raw_summ[[2]] %>%
+  map(~ select(.x, !c(...1, ...2, ...3))) %>%
+  map(~ rename(.x, Summary_stat = ...4))
+dat_raw_summ[[2]][[1]]
+```
+
+```{r, eval = FALSE}
+
+dat_un <- dat_raw %>%
+  unnest(head) %>%
+  unnest(data)
+
+dat_un <- dat_un %>%
+  select(data_files, Datafile_ID, time, Arena, Action, Zone_no) %>%
+  rename(Data_file = data_files)
+
+```
+
+```{r, eval = FALSE}
+dat_un <- dat_un %>%
+  mutate(Row_ID = row_number()) %>%
+  pivot_wider(names_from = Action, values_from = Zone_no) %>%
+  rename(Exit_zone = Exit_Zone, Enter_zone = Enter_Zone)
+dat_un
+```
+
+```{r, eval = FALSE}
+dat_an <- dat_un
+dat_an <- dat_an %>%
+  mutate(Bin = ifelse(time > 600 & time < 1200, 1,
+                      ifelse(time > 1200 & time < 1800, 2,
+                             ifelse(time > 1800 & time < 2500, 3, NA))))
+
+dat_an <- dat_an %>%
+  arrange(Data_file, Datafile_ID, Arena, time, Exit_zone)
+dat_an
+```
+
+```{r, eval = FALSE}
+dat_an <- dat_an %>%
+  mutate(Zone = ifelse(Enter_zone == lead(Exit_zone), Enter_zone, 666)) %>%
+  mutate(t_enter = ifelse(Enter_zone >= 1, time, 666)) %>%
+  mutate(t_exit = ifelse(Exit_zone >= 1, time, 666))
+
+dat_an %>% filter(Zone == 666)
+dat_an %>% filter(t_enter == 666)
+dat_an %>% filter(t_exit == 666)
+
+# ALL GOOD! Note - this step is very important and serves to test if data points were sorted correctly
+# Single detected mistakes are likely final entries that failed to exit before assay end
+
+
+# Let's filter out the non-conforming cases and re-confirm the rest is ordered correctly
+# This stage is critical: dplyr filter() function is terribly unintuitive - with the logical
+# condition "NOT" (!) it also drops NA values - thus we have to ensure with replace_na() they are kept
+# to preserve the ordering of enter-exit events
+
+dat_an <- dat_an %>% filter((Zone != 666) %>% replace_na(TRUE))
+dat_an <- dat_an %>%
+  arrange(Data_file, Datafile_ID, Arena, time, Exit_zone)
+dat_an <- dat_an %>%
+  mutate(Zone = ifelse(Enter_zone == lead(Exit_zone), Enter_zone, 666)) %>%
+  mutate(t_enter = ifelse(Enter_zone >= 1, time, 666)) %>%
+  mutate(t_exit = ifelse(Exit_zone >= 1, time, 666))
+dat_an %>% filter(Zone == 666)
+# repeat above 4 steps until last line of code returns empty tibble
+```
+
+```{r, eval = FALSE}
+dat_an <- dat_an %>%
+  # filter(is.na(Zone)) %>% # this filter is just for testing purposes (it removes the 'Exit_zone' portion of data)
+  select(Data_file, Datafile_ID, time, Arena, Row_ID, Bin, Zone, t_enter, t_exit)
+dat_an <- dat_an %>%
+  mutate(t_exit = lead(t_exit))
+dat_an <- na.omit(dat_an)
+dat_an <- dat_an %>%
+  mutate(t_zone = t_exit - t_enter)
+dat_an
+```
+
+```{r, eval = FALSE}
+dat_an2 <- dat_an %>% filter(Zone != 4)
+dat_an2
+
+# create individual ID
+dat_an2$Individual_ID <- paste0(dat_an2$Datafile_ID, "_", dat_an2$Arena)
+```
+
+```{r, eval = FALSE}
+
+#Movement analysis and session info merging.
+
+# well_arena <- read_delim(here('Data', 'run_data', 'well_arena_corresp.csv'), delim = ';')
+
+dat_an2 <- dat_an2 %>%
+  left_join(Session_data, by = "Individual_ID")
+# mutate(Ymaze_arena = paste0(Plate, "_", Arena)) %>%
+# mutate(fly_id = paste(gsub('[A-Za-z0-9]+\\/([A-Za-z0-9_-]+)\\.csv', '\\1', data_files), arena, sep = "_"))
+# mutate(fly_id = paste0(Datafile_ID, "_", Ymaze_arena)) %>% # not really necessary
+# left_join(select(well_arena, Ymaze_arena, Plate48well), by = "Ymaze_arena") %>%
+# mutate(Individuals_ID_well = paste0(Individuals_ID, "_", Plate48well)) %>%
+# select(Datafile_ID, Individuals_ID, Individuals_ID_well, Ymaze_arena, time, Bin, Zone, t_zone)
+
+# split datafile into individual flies
+dat_an2 <- dat_an2 %>% split(., .[, "Individual_ID"])
+
+dat_an2 <- dat_an2 %>%
+  map(~ mutate(.x, Lag_zone = lag(Zone))) %>%
+  map(~ mutate(.x, Turn = case_when(Lag_zone==1 & Zone==2 ~ 'L',
+                                    Lag_zone==1 & Zone==3 ~ 'R',
+                                    Lag_zone==2 & Zone==1 ~ 'R',
+                                    Lag_zone==2 & Zone==3 ~ 'L',
+                                    Lag_zone==3 & Zone==1 ~ 'L',
+                                    Lag_zone==3 & Zone==2 ~ 'R',
+                                    # lag_zone==zone ~ 'X', # this enables additional decision type = stay in the given zone
+                                    TRUE ~ NA_character_ ))) %>%
+  map(~ select(.x, Datafile_ID, Individual_ID, Arena, time, Bin, Zone, t_zone, Turn))
+
+dat_an3 <- bind_rows(dat_an2)
+dat_an3 <- dat_an3 %>%
+  arrange(Datafile_ID, Individual_ID, Bin)
+
+dat_an4 <- na.omit(dat_an3)
+dat_an4
+```
+
+```{r, eval = FALSE}
+dat_tri <- dat_an4 %>%
+  group_by(Individual_ID)
+
+dat_tri <- dat_tri %>%
+  mutate(Trigram = str_c(Turn, lead(Turn), lead(Turn,2))) %>%
+  ungroup() %>%
+  select(Individual_ID, Turn, Trigram)
+dat_tri
+```
+
+```{r, eval = FALSE}
+all_trigrams <- unique(dat_tri$Trigram)
+
+tri_long <- dat_tri %>%
+  select(-Turn) %>%
+  na.omit() %>%
+  group_by(Individual_ID) %>%
+  table() %>%
+  as_tibble() %>%
+  arrange(Individual_ID)
+
+tri_wide <- tri_long %>% pivot_wider(names_from = Trigram, values_from = n)
+
+turn_long = dat_tri %>%
+  select(-Trigram) %>%
+  na.omit() %>%
+  group_by(Individual_ID) %>%
+  table() %>%
+  as_tibble() %>%
+  arrange(Individual_ID)
+
+turn_wide <- turn_long %>% pivot_wider(names_from = Turn, values_from = n)
+
+data_ymaze <- tri_wide %>%
+  left_join(turn_wide, by = 'Individual_ID') %>%
+  mutate(total_turns = L+R,
+         reps = LLL + RRR,
+         alter = RLR + LRL,
+         partial = RRL + RLL + LRR + LLR,
+         rel_reps = (reps*100)/total_turns,
+         rel_alter = (alter*100)/total_turns,
+         rel_R = (R*100)/total_turns,
+         rel_L = (L*100)/total_turns,
+         asymmetry = 1 - (R/L)) # 0 = symmetrical, <1 = 
+
+data_ymaze
+```
+
+```{r, eval = FALSE}
+
+data_ymaze <- data_ymaze %>%
+  left_join(Session_data, by = "Individual_ID")
+
+write.table(data_ymaze, "./data/data_ymaze.csv", sep = ",", row.names = F)
+```
+
+#### Startle
+
+```{r, eval = FALSE}
+#specify directory of zantiks habituation files
+data_path <- here("Data/habituation/") 
+
+#create list of files from directory
+file_list <- list.files(data_path)
+
+#create header from first file
+df <-
+  paste(data_path, file_list[1],sep = '/') %>%
+  read_csv(skip=4,col_names = TRUE, guess_max = 100) %>%
+  head(0)
+
+#create new list without demographic info
+new_list<- c()
+
+for (i in file_list){
+  new_list[[i]] <-
+    read_csv(paste(data_path, i, sep = '/'),
+             skip=4, col_names = TRUE, guess_max = 100) %>%
+    head(-1)
+}
+
+#append all files to df
+for (i in new_list){
+  df<-add_row(df,i)
+}
+```
+
+```{r, eval = FALSE}
+df <- df %>% select(!c(RUNTIME, UNIT, TIMESLOT, TEMPERATURE))
+#convert variables to factors for anova
+df<-as_factor(df,BLOCK)
+df<-as_factor(df,TYPE)
+
+df <- df %>% rename(Datafile_ID = PLATE_ID, time_bin = TIME_BIN,
+                    Block = BLOCK, Trial = TRIAL, Type = TYPE,
+                    pre_post_counter = PRE_POST_COUNTER,
+                    startle_number = STARTLE_NUMBER)
+
+df <- df %>% select(-c(F6:F8), -c(F6MSD:F8MSD))
+```
+
+```{r, eval = FALSE}
+dfile_dist <- df %>% 
+  select(!ends_with("MSD")) %>%
+  gather(key = "Well", value = "distance", -Datafile_ID,
+         -time_bin, -Block, -Trial, -Type, -pre_post_counter,
+         -startle_number) %>%
+  convert_as_factor(Well)
+
+# create file with well factor and MSD activity dv only
+dfile_act<- df %>%
+  select(ends_with("MSD")) %>%
+  gather(key = "Well", value = "activity") %>%
+  convert_as_factor(Well)
+
+# remove duplicate well variable before adding activity data
+dfile_act <- select(dfile_act, -'Well')
+
+# add activity column to rest of data
+df <- add_column(dfile_dist, dfile_act)
+
+# remove acclimation data
+no_acclimation <- df %>%
+  filter(Type != "ACCLIMATION")
+
+# create data file with only startles from first repeat (Block == 1)
+startles_only <- filter(no_acclimation, Type == "STARTLE", Block == 1)
+# pop_startles_only<-filter(pop_data, Type == "STARTLE", Block == 1)
+```
+
+```{r, eval = FALSE}
+# startles_only <- startles_only %>%
+#     left_join(select(run_register, Datafile_ID, Individuals_ID, Exp_block, Batch_ID))
+
+startles_only <- startles_only %>%
+  mutate(Individual_ID = paste0(Datafile_ID, "_", Well))
+
+startles_only <- startles_only %>%
+  left_join(Session_data, by = "Individual_ID")
+```
+
+```{r, eval = FALSE}
+startles_only <- startles_only %>%
+  group_by(Individual_ID)
+
+startles_only_act <- startles_only %>%
+  filter(sum(distance) != 0) %>%
+  ungroup()
+
+overall_summary_act <- startles_only_act %>%
+  group_by(startle_number) %>%
+  get_summary_stats(distance, type = "mean_sd")
+
+overall_summary <- startles_only %>%
+  group_by(startle_number) %>%
+  get_summary_stats(distance, type = "mean_sd")
+
+binary_summary <- startles_only %>%
+  group_by(Individual_ID) %>%
+  summarise(startle_binary = ifelse(sum(distance) != 0, 1, 0))
+
+startle_binary <- binary_summary %>%
+  left_join(Session_data, by = 'Individual_ID')
+
+write.table(startles_only, file = "./data/data_startle.csv", sep = ",", row.names = F)
+write.table(startles_only_act, file = "./data/data_startle_act.csv", sep = ",", row.names = F)
+write.table(startle_binary, file = "./data/data_startle_binary.csv", sep = ",", row.names = F)
+```
+
+# Mean response analysis {.tabset}
+
+```{r 28_removing individuals}
+#removing the individuals that got mixed up/went missing etc
+
+data_locomotion$Exclude_mean <- as.factor(data_locomotion$Exclude_mean)
+
+data_locomotion_reduced <- droplevels(data_locomotion[!data_locomotion$Exclude_mean == 'exclude',])
+
+data_ymaze_reduced <- droplevels(data_ymaze[!data_ymaze$Exclude_mean == 'exclude',])
+
+data_startle_act_reduced <- droplevels(data_startle_act[!data_startle_act$Exclude_mean == 'exclude',])
+
+data_startle_binary_reduced <- droplevels(data_startle_binary[!data_startle_binary$Exclude_mean == 'exclude',])
+
+#getting N
+# n_distinct(data_locomotion_reduced$Individual_ID)
+# n_distinct(data_ymaze_reduced$Individual_ID)
+# n_distinct(data_startle_act_reduced$Individual_ID) #this is super low because many flies did not move across each of the three startles
+# n_distinct(data_startle_binary_reduced$Individual_ID)
+```
+
+## Locomotion
+
+
+```{r locomotion mean effect}
+
+m <- lmer(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch), dat = data_locomotion_reduced)
+
+Anova(m)
+summary(m)
+# qplot(residuals(m)) + theme_classic()
+
+#variance explained by random effects
+rept <- rpt(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"), data = data_locomotion_reduced, datatype = "Gaussian", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+
+print(rept)
+
+#individual_id % var
+1.124 / (1.124 + 0.152 + 1.248 + 0.159)*100
+
+#batch 
+0.152 / (1.124 + 0.152 + 1.248 + 0.159)*100
+
+```
+
+## Startle resonse 
+
+### Binomial 
+Analysis of if the flies showed at least one startle across the three startles 
+
+```{r}
+data_startle_binary_reduced$Sex <- as.factor(data_startle_binary_reduced$Sex)
+data_startle_binary_reduced$Treatment <- as.factor(data_startle_binary_reduced$Treatment)
+
+m2 <- glmer(startle_binary~Sex*Treatment + (1|Batch), family = binomial, data = data_startle_binary_reduced) #far more isolated flies were startled
+Anova(m2)
+summary(m2)
+
+#viewing contrast beteween I and GS
+m2a <-glmer(startle_binary~ Sex*relevel(factor(Treatment), ref = "GS") + (1|Batch), family = binomial, data = data_startle_binary_reduced)
+summary(m2a)
+
+
+# sample_size <- data_startle_binary_reduced %>%
+#   group_by (Treatment, Sex) %>%
+#   summarise(n = n())
+# sample_size
+
+```
+
+### Habituation
+
+```{r}
+m3 <- lmer(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
+
+Anova(m3) #model used in manuscript
+
+#variance explained by random effects
+rept <- rpt(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), grname  = c("Individual_ID", "Batch", "Fixed", "Residual"), data = data_startle_act_reduced, datatype = "Gaussian", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+
+print(rept)
+
+# #individual
+# 0.134 / (0.134 + 0+ 0.708 + 0.07)*100
+# 
+# #batch
+# 0 /(0.134 + 0+ 0.708 + 0.07)*100
+```
+
+## Y-maze
+
+Wranging data into long form
+```{r}
+data_ymaze_reduced_long <- data_ymaze_reduced %>%
+  pivot_longer(cols = c('LLL', 'LLR', 'LRL','LRR', 'RLL', 'RLR', 'RRL', 'RRR'), names_to = "Trigram", values_to = "Count")
+
+
+data_ymaze_reduced_long_trigramtype <- data_ymaze_reduced_long %>% pivot_longer(cols = c('reps', 'alter'), names_to = "Type", values_to = "Count_type") %>%
+  select(-c(Trigram, Count)) %>%
+  distinct() 
+```
+
+### Comparison of trigram type
+```{r}
+#comparison of trigram type
+m4 <- glmer(Count_type~ Type + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
+Anova(m4)
+summary(m4)
+```
+
+### Alternations
+
+```{r}
+m5 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced)
+Anova(m5)
+
+#variance explained by random effects
+rept <- rpt(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"),data = data_ymaze_reduced_long, datatype = "Poisson",link = "log", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+print(rept)
+# 
+# #individual_ID
+# 0.535 / (0.535 + 0.03 + 0.318 + 0.341)*100
+# 
+# #batch
+# 0.03 / (1.57 + 0.053 + 0.098 + 0.558)*100
+```
+
+### Repetitions
+
+```{r}
+m6 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced)
+Anova(m6)
+
+#variance explained by random effects
+rept <- rpt(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"),data = data_ymaze_reduced_long, datatype = "Poisson",link = "log", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)s
+print(rept)
+
+#individual_ID
+# 0.454 / (0.454 + 0.065 + 0.766 + 0.875)*100
+# 
+# 
+# 0.065 / (0.454 + 0.065 + 0.766 + 0.875)*100
+```
+
+### Three-way interaction 
+Supplementary material Table S1
+
+```{r}
+m7 <- glmer(Count_type~ Type*Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
+Anova(m7)
+```
+
+# Trait correlation analysis {.tabset}
+
+```{r}
+#exluding the flies we lost track of during transfer so may have been in wrong well/ymaze
+data_locomotion_reduced$Exclude_correlation <- as.factor(data_locomotion_reduced$Exclude_correlation)
+
+data_locomotion_reduced2 <- droplevels(data_locomotion_reduced[!data_locomotion_reduced$Exclude_correlation == 'exclude',])
+
+data_ymaze_reduced_long$Exclude_correlation <- as.factor(data_ymaze_reduced_long$Exclude_correlation)
+
+data_ymaze_reduced_long2 <- droplevels(data_ymaze_reduced_long[!data_ymaze_reduced_long$Exclude_correlation == 'exclude',])
+
+data_startle_binary_reduced$Exclude_correlation <- as.factor(data_startle_binary_reduced$Exclude_correlation)
+
+data_startle_binary_reduced2 <- droplevels(data_startle_binary_reduced[!data_startle_binary_reduced$Exclude_correlation == 'exclude',])
+
+#joining datasets
+data_loco_ymaze <- left_join(data_locomotion_reduced2, data_ymaze_reduced_long2, by = 'ID') %>% 
+  select(ID, arena_distance, reps, alter, partial, Sex.x, Treatment.x) %>%
+  group_by(ID) %>%
+  mutate(avg_loco = mean(arena_distance)) %>%
+  select(ID, reps, alter, partial, Sex.x, Treatment.x, avg_loco) %>%
+  distinct()
+
+data_loco_ymaze_startle <- left_join(data_loco_ymaze, data_startle_binary_reduced2, by = 'ID') %>% 
+  select(ID, avg_loco, reps, alter, partial, Sex.x, Treatment.x,startle_binary) %>%
+  group_by(ID) %>%
+  distinct()
+```
+
+## Correlations across treatment and sex
+
+```{r}
+model_cor1 <- MCMCglmm(cbind(avg_loco, reps, startle_binary) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait):units,
+                       family = c("gaussian", "poisson", "gaussian"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze_startle),
+                       prior = list(R = list(V = diag(3), nu = 2.002)))
+
+summary(posterior.cor(model_cor1$VCV))
+HPDinterval(posterior.cor(model_cor1$VCV))
+colMeans(posterior.cor(model_cor1$VCV))
+
+```
+
+## Split by treatment
+
+```{r}
+ata_loco_ymaze_startle$Treatment.x <- as.factor(data_loco_ymaze_startle$Treatment.x)
+
+model_cor2 <- MCMCglmm(cbind(startle_binary,avg_loco, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait:at.level(Treatment.x, "GS")):units +
+                         us(trait:at.level(Treatment.x, "GM")):units + 
+                         us(trait:at.level(Treatment.x, "I")):units,
+                       family = c("gaussian", "gaussian", "poisson"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze_startle),
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002),
+                                             R3 = list(V = diag(3), nu = 2.002))))
+
+#GS
+summary(posterior.cor(model_cor2$VCV[,1:9]))
+
+# GM
+summary(posterior.cor(model_cor2$VCV[,10:18]))
+
+# I
+summary(posterior.cor(model_cor2$VCV[,19:27]))
+```
+
+## Split by sex
+
+```{r}
+data_loco_ymaze_startle$Sex.x <- as.factor(data_loco_ymaze_startle$Sex.x)
+
+model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
+                       rcov = ~us(trait:at.level(Sex.x, "M")):units +
+                         us(trait:at.level(Sex.x, "F")):units,
+                       family = c("gaussian", "gaussian", "poisson"),
+                       nitt = 100000, burnin = 20000, thin = 80,
+                       data = as.data.frame(data_loco_ymaze_startle),
+                       prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
+                                             R2 = list(V = diag(3), nu = 2.002))))
+
+# Males
+summary(posterior.cor(model_cor3$VCV[,1:9]))
+
+# Females
+summary(posterior.cor(model_cor3$VCV[,10:18]))
+```

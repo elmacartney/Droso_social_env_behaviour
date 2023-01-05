@@ -1316,6 +1316,8 @@ summary(posterior.cor(model_cor1$VCV))
 HPDinterval(posterior.cor(model_cor1$VCV))
 colMeans(posterior.cor(model_cor1$VCV))
 
+
+#plotting
 #creating dataframe 
 
 means <- colMeans(posterior.cor(model_cor1$VCV))
@@ -1323,9 +1325,6 @@ summary <- as.data.frame(HPDinterval(posterior.cor(model_cor1$VCV)))
 summary$mean <- means
 summary<-summary[c(2,3,6),]
 summary$assay <- c("locomotion~repetitions", "locomotion~startle", "startle~repetitions")
-
-
-#plotting
 
 summary$assay <- as.factor(summary$assay)
 
