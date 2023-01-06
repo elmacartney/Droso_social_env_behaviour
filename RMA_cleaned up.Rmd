@@ -606,7 +606,7 @@ m3 <- lmer(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Indi
 Anova(m3) #model used in manuscript
 
 #variance explained by random effects
-rept <- rpt(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), grname  = c("Individual_ID", "Batch", "Fixed", "Residual"), data = data_startle_act_reduced, datatype = "Gaussian", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
+rept <- rpt(log(distance + 1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), grname  = c("Individual_ID", "Batch", "Fixed", "Residual"), data = data_startle_act_reduced, datatype = "Gaussian", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
 
 print(rept)
 
@@ -617,7 +617,7 @@ print(rept)
 # 0 /(0.134 + 0+ 0.708 + 0.07)*100
 ```
 
-## Y-maze
+### Y-maze
 
 Wranging data into long form
 ```{r}
@@ -712,13 +712,20 @@ data_loco_ymaze_startle <- left_join(data_loco_ymaze, data_startle_binary_reduce
 
 ## Correlations across treatment and sex
 
-```{r}
+```{r, eval = FALSE}
 model_cor1 <- MCMCglmm(cbind(avg_loco, reps, startle_binary) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait):units,
                        family = c("gaussian", "poisson", "gaussian"),
                        nitt = 100000, burnin = 20000, thin = 80,
                        data = as.data.frame(data_loco_ymaze_startle),
                        prior = list(R = list(V = diag(3), nu = 2.002)))
+
+saveRDS(model_cor1, file = "model_cor1.rds")
+```
+
+```{r.}
+
+model_cor1 <- readRDS("model_cor1.rds")
 
 summary(posterior.cor(model_cor1$VCV))
 HPDinterval(posterior.cor(model_cor1$VCV))
@@ -729,7 +736,8 @@ colMeans(posterior.cor(model_cor1$VCV))
 ## Split by treatment
 
 ```{r}
-ata_loco_ymaze_startle$Treatment.x <- as.factor(data_loco_ymaze_startle$Treatment.x)
+model_cor2 <- readRDS("model_cor2.rds")
+data_loco_ymaze_startle$Treatment.x <- as.factor(data_loco_ymaze_startle$Treatment.x)
 
 model_cor2 <- MCMCglmm(cbind(startle_binary,avg_loco, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
                        rcov = ~us(trait:at.level(Treatment.x, "GS")):units +
@@ -742,6 +750,11 @@ model_cor2 <- MCMCglmm(cbind(startle_binary,avg_loco, reps) ~ -1 + trait + trait
                                              R2 = list(V = diag(3), nu = 2.002),
                                              R3 = list(V = diag(3), nu = 2.002))))
 
+saveRDS(model_cor2, file = "model_cor2.rds")
+```
+
+```{r}
+model_cor2 <- readRDS("model_cor2.rds")
 #GS
 summary(posterior.cor(model_cor2$VCV[,1:9]))
 
@@ -754,7 +767,7 @@ summary(posterior.cor(model_cor2$VCV[,19:27]))
 
 ## Split by sex
 
-```{r}
+```{r, eval = FALSE}
 data_loco_ymaze_startle$Sex.x <- as.factor(data_loco_ymaze_startle$Sex.x)
 
 model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trait:Sex.x + trait:Treatment.x,
@@ -766,9 +779,305 @@ model_cor3 <- MCMCglmm(cbind(avg_loco, startle_binary, reps) ~ -1 + trait + trai
                        prior = list(R = list(R1 = list(V = diag(3), nu = 2.002),
                                              R2 = list(V = diag(3), nu = 2.002))))
 
+saveRDS(model_cor3, file = "model_cor3.rds")
+```
+
+```{r}
+model_cor3 <- readRDS("model_cor3.rds")
+
 # Males
 summary(posterior.cor(model_cor3$VCV[,1:9]))
 
 # Females
 summary(posterior.cor(model_cor3$VCV[,10:18]))
+```
+
+# Plotting {.tabset}
+
+## Fig. 1
+
+```{r}
+data_summary <- function(x) {
+  m <- mean(x)
+  ymin <- m-sd(x)
+  ymax <- m+sd(x)
+  return(c(y=m,ymin=ymin,ymax=ymax))
+}
+
+data_locomotion_reduced<-subset(data_locomotion_reduced, select = -Comment)
+data_locomotion_reduced$Treatment<-as.factor(data_locomotion_reduced$Treatment)
+data_locomotion_reduced$Sex<-as.factor(data_locomotion_reduced$Sex)
+
+plot1 <- na.omit(data_locomotion_reduced) %>% 
+  ggplot(aes(x = Treatment, y = log(arena_distance+1), fill= Sex)) + 
+  geom_violin(position = position_dodge(1)) + stat_summary(fun.data=data_summary, position = position_dodge(1))  + labs(x = "Treatment", y = "log(arena distance + 1)") +
+  theme_classic() +
+  scale_fill_brewer(palette = "Set1") +
+  theme(legend.position = "none", axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), axis.text = element_text(size = 12))
+
+
+plot1
+
+#saved as PDF 6 x 6 inch
+```
+
+## Fig. 2
+
+```{r}
+data_startle_act_reduced$log_distance <- log(data_startle_act_reduced$distance + 1)
+
+g<-data_startle_act_reduced %>%
+  group_by(Treatment,Sex, startle_number) %>%
+  summarise(mean=mean(log_distance), sd = sd(log_distance))
+
+g$startle_number<-as.factor(g$startle_number)
+
+#males
+plot2a <- na.omit(g) %>%
+  filter(Sex == "M") %>%
+  ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
+  geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
+                width = 1,
+                size = 1,
+                position = position_dodge(1)) +
+  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  ylim(-0.2, 2.5) + theme(text = element_text(size = 15), legend.position = "none") + labs(x = 'Treatment',
+                                                                                           y = 'log(arena distance +1)',
+                                                                                           col = "Startle number",
+                                                                                           title = "Males") +
+  scale_colour_manual(values = c("#000000", "#808080", "#C0C0C0")) +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
+
+#Females
+plot2b <- na.omit(g) %>%
+  filter(Sex == "F") %>%
+  ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
+  geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
+                width = 1,
+                size = 1,
+                position = position_dodge(1)) +
+  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  ylim(-0.2, 2.5) +
+  theme(text = element_text(size = 15)) + labs(x = 'Treatment',
+                                               y = 'log(arena distance +1)',
+                                               col = "Startle number",
+                                               title = "Females") +
+  scale_colour_manual(values = c("#000000", "#808080", "#C0C0C0")) +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
+
+
+plot2 <- (plot2a + plot2b)
+plot2
+
+#plot saved as PDF 7 x 14 inch
+```
+
+## Fig. 3
+
+```{r}
+
+plot3a <- data_ymaze_reduced_long %>%
+  # filter(n > 0) %>%
+  ggplot(aes(x = Trigram, y = Count)) +
+  geom_col(position = "stack")+
+  theme_classic() + labs(x = 'Trigram', y = 'Total count') +
+  theme(legend.position = "none", text = element_text(size = 15))
+
+plot3b <- data_ymaze_reduced_long_trigramtype %>%
+  ggplot(aes(x = Type, y = Count_type)) +
+  geom_col(position = "stack") +
+  theme_classic() + theme(text = element_text(size = 15)) +
+  labs(x = "Trigram type", y = 'Count') +
+  scale_x_discrete(labels = c("alternations", "repetitions"))
+
+
+plot3 <- ((plot3a + plot3b) + plot_annotation(tag_levels = 'A'))
+plot3 
+
+```
+
+## Fig. 3
+
+```{r}
+
+data_ymaze_reduced_long2$Treatment<-as.factor(data_ymaze_reduced_long2$Treatment)
+
+plot4a <- na.omit(data_ymaze_reduced_long2) %>%
+  # filter(Type == "alter") %>%
+  ggplot(aes(x = Treatment, y = alter, fill = Sex)) + geom_col(position = "stack")+
+  theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+  labs(x = "Treatment", y = 'Count', title = 'Alternations') +
+  scale_fill_brewer(palette = "Set1") +
+  ylim(0,10000)
+
+plot4b <- na.omit(data_ymaze_reduced_long2) %>%
+  # filter(Type == "reps") %>%
+  ggplot(aes(x = Treatment, y = reps, fill = Sex)) + geom_col(position = "stack") +
+  theme_classic() + theme(text = element_text(size = 15), legend.position = "none") +
+  labs(x = "Treatment", y = 'Count', title = 'Repetitions') +
+  scale_fill_brewer(palette = "Set1") +
+  ylim(0,10000)
+
+plot4<- (plot4a + plot4b) 
+plot4
+```
+
+## Fig. 5
+
+```{r}
+#overall correlations
+means <- colMeans(posterior.cor(model_cor1$VCV))
+summary <- as.data.frame(HPDinterval(posterior.cor(model_cor1$VCV)))
+summary$mean <- means
+summary<-summary[c(2,3,6),]
+summary$assay <- c("locomotion~repetitions", "locomotion~startle", "startle~repetitions")
+
+summary$assay <- as.factor(summary$assay)
+
+plot5a <- summary %>%
+  mutate(assay = fct_relevel(assay, "locomotion~startle", "locomotion~repetitions", "startle~repetitions")) %>%
+  ggplot(aes(x = assay, y = mean)) +
+  geom_errorbar(aes(
+    ymin = lower,
+    ymax = upper ,
+    width = 1,
+    size = 1
+  )) +
+  geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
+  ylim(-0.5, 0.5) + labs(x = 'Assay correlations',
+                         y = 'Posterior mean',) +
+  theme(legend.position = "none",
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text = element_text(size = 12)
+  ) +
+  geom_hline(yintercept = 0, colour = 'red', lty = 2, size = 1)
+
+```
+
+```{r}
+#by treatment
+#GS summary
+GS_means <- colMeans(posterior.cor(model_cor2$VCV[,1:9]))
+GS_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,1:9])))
+GS_summary$mean <- GS_means
+GS_summary<-GS_summary[c(2,3,6),]
+GS_summary$assay <- c("locomotion~startle", "startle~repetitions", "locomotion~repetitions")
+GS_summary$treatment <- c("GS", "GS", "GS")
+
+#GM summary
+GM_means <- colMeans(posterior.cor(model_cor2$VCV[,10:18]))
+GM_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,10:18])))
+GM_summary$mean <- GM_means
+GM_summary<-GM_summary[c(2,3,6),]
+GM_summary$assay <- c("locomotion~startle", "startle~repetitions", "locomotion~repetitions")
+GM_summary$treatment <- c("GM", "GM", "GM")
+
+#I summary
+I_means <- colMeans(posterior.cor(model_cor2$VCV[,19:27]))
+I_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor2$VCV[,19:27])))
+I_summary$mean <- I_means
+I_summary<-I_summary[c(2,3,6),]
+I_summary$assay <- c("locomotion~startle", "startle~repetitions", "locomotion~repetitions")
+I_summary$treatment <- c("I", "I", "I")
+
+treatment_merged <- rbind(I_summary, GS_summary,GM_summary)
+
+treatment_merged$assay<-as.factor(treatment_merged$assay)
+treatment_merged$treatment<-as.factor(treatment_merged$treatment)
+
+plot5b <- treatment_merged %>%
+  mutate(assay = fct_relevel(assay, "locomotion~startle", "locomotion~repetitions", "startle~repetitions")) %>%
+  ggplot(aes(x = assay, y = mean, col = treatment)) +
+  geom_errorbar(aes(
+    ymin = lower,
+    ymax = upper), 
+    width = 1,
+    size = 1,
+    position = position_dodge(1)
+  ) +
+  geom_point(position = position_dodge(1), size = 5) + theme_classic() +
+  scale_colour_brewer(palette = "Dark2") +
+  ylim(-0.5,0.5) + labs(x = 'Assay correlations',
+                        y = 'Posterior mean',
+                        col = 'Treatment',
+                        legend_position = "none") +
+  theme(
+    legend.position = "bottom",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )  +
+  geom_hline(yintercept = 0, colour = 'red', lty = 2)
+```
+
+```{r}
+#by sex
+
+#Males summary
+M_means <- colMeans(posterior.cor(model_cor3$VCV[,1:9]))
+M_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor3$VCV[,1:9])))
+M_summary$mean <- M_means
+M_summary<-M_summary[c(2,3,6), ]
+M_summary$assay <- c("locomotion~startle", "startle~repetitions", "locomotion~repetitions")
+M_summary$sex <- c("male", "male", "male")
+
+#GM summary
+F_means <- colMeans(posterior.cor(model_cor3$VCV[,10:18]))
+F_summary <- as.data.frame(HPDinterval(posterior.cor(model_cor3$VCV[,10:18])))
+F_summary$mean <- F_means
+F_summary<-F_summary[c(2,3,6),]
+F_summary$assay <- c("locomotion~startle", "startle~repetitions", "locomotion~repetitions")
+F_summary$sex <- c("female", "female", "female")
+
+
+sex_merged <- rbind(M_summary, F_summary)
+
+sex_merged$assay<-as.factor(sex_merged$assay)
+sex_merged$sex<-as.factor(sex_merged$sex)
+
+#plotting
+
+plot5c <- sex_merged %>%
+  mutate(assay = fct_relevel(assay, "locomotion~startle", "locomotion~repetitions", "startle~repetitions")) %>%
+  ggplot(aes(x = assay, y = mean, col = sex)) +
+  geom_errorbar(aes(
+    ymin = lower,
+    ymax = upper),
+    width = 1,
+    size = 1,
+    position = position_dodge(1)
+  ) +
+  geom_point(position = position_dodge(1), size = 5) + theme_classic() +
+  scale_color_brewer(palette = "Set1") +
+  ylim(-0.5,0.5) + labs(x = 'Assay correlations',
+                    y = 'Posterior mean',
+                    col = 'Treatment',
+                    legend_position = "none") +
+  theme(
+    legend.position = "bottom",
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )  +
+  geom_hline(yintercept = 0, colour = 'red', lty = 2)
+
+```
+
+```{r}
+plot5 <- plot5a / (plot5b + plot5c) + plot_annotation(tag_levels = 'A')
+
+plot5
+
+#saved as pdf 10 x 15 inch
 ```
