@@ -566,10 +566,10 @@ rept <- rpt(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch
 print(rept)
 
 #individual_id % var
-1.124 / (1.124 + 0.152 + 1.248 + 0.159)*100
-
-#batch 
-0.152 / (1.124 + 0.152 + 1.248 + 0.159)*100
+# 1.124 / (1.124 + 0.152 + 1.248 + 0.159)*100
+# 
+# #batch 
+# 0.152 / (1.124 + 0.152 + 1.248 + 0.159)*100
 
 ```
 
@@ -617,7 +617,7 @@ print(rept)
 # 0 /(0.134 + 0+ 0.708 + 0.07)*100
 ```
 
-### Y-maze
+## Y-maze
 
 Wranging data into long form
 ```{r}
@@ -662,7 +662,7 @@ m6 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson
 Anova(m6)
 
 #variance explained by random effects
-rept <- rpt(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"),data = data_ymaze_reduced_long, datatype = "Poisson",link = "log", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)s
+rept <- rpt(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), grname = c("Individual_ID", "Batch", "Fixed", "Residual"),data = data_ymaze_reduced_long, datatype = "Poisson",link = "log", nboot = 0, npermut = 0, parallel = TRUE, ratio = FALSE)
 print(rept)
 
 #individual_ID
@@ -723,7 +723,7 @@ model_cor1 <- MCMCglmm(cbind(avg_loco, reps, startle_binary) ~ -1 + trait + trai
 saveRDS(model_cor1, file = "model_cor1.rds")
 ```
 
-```{r.}
+```{r}
 
 model_cor1 <- readRDS("model_cor1.rds")
 
@@ -735,7 +735,7 @@ colMeans(posterior.cor(model_cor1$VCV))
 
 ## Split by treatment
 
-```{r}
+```{r, eval = FALSE}
 model_cor2 <- readRDS("model_cor2.rds")
 data_loco_ymaze_startle$Treatment.x <- as.factor(data_loco_ymaze_startle$Treatment.x)
 
@@ -764,6 +764,7 @@ summary(posterior.cor(model_cor2$VCV[,10:18]))
 # I
 summary(posterior.cor(model_cor2$VCV[,19:27]))
 ```
+
 
 ## Split by sex
 
@@ -823,7 +824,7 @@ plot1
 
 ## Fig. 2
 
-```{r}
+```{r, message = FALSE, warning  = FALSE}
 data_startle_act_reduced$log_distance <- log(data_startle_act_reduced$distance + 1)
 
 g<-data_startle_act_reduced %>%
