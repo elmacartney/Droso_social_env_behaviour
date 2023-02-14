@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(tidyverse)
 library(lme4)
 library(lmerTest)
-library(here) # write out the path
+library(here) 
 library(kableExtra)
 library(sjlabelled)
 library(ggpubr)
@@ -557,7 +557,7 @@ data_startle_binary_reduced <- droplevels(data_startle_binary[!data_startle_bina
 m <- lmer(log(arena_distance+1) ~ Treatment*Sex + (1|Individual_ID) + (1|Batch), dat = data_locomotion_reduced)
 
 Anova(m)
-summary(m)
+# summary(m)
 # qplot(residuals(m)) + theme_classic()
 
 #variance explained by random effects
@@ -584,11 +584,11 @@ data_startle_binary_reduced$Treatment <- as.factor(data_startle_binary_reduced$T
 
 m2 <- glmer(startle_binary~Sex*Treatment + (1|Batch), family = binomial, data = data_startle_binary_reduced) #far more isolated flies were startled
 Anova(m2)
-summary(m2)
+# summary(m2)
 
 #viewing contrast beteween I and GS
 m2a <-glmer(startle_binary~ Sex*relevel(factor(Treatment), ref = "GS") + (1|Batch), family = binomial, data = data_startle_binary_reduced)
-summary(m2a)
+# summary(m2a)
 
 
 # sample_size <- data_startle_binary_reduced %>%
