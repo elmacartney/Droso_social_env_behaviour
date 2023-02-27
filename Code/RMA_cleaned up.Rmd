@@ -1,5 +1,5 @@
 ---
-title: "Dmel Social Environment on Behaviour"
+title: "Sex specific effects of social environment on behaviour"
 author: "Erin Macartney"
 date: "`r Sys.Date()`"
 output:
@@ -578,7 +578,7 @@ print(rept)
 ### Binomial 
 Analysis of if the flies showed at least one startle across the three startles 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 data_startle_binary_reduced$Sex <- as.factor(data_startle_binary_reduced$Sex)
 data_startle_binary_reduced$Treatment <- as.factor(data_startle_binary_reduced$Treatment)
 
@@ -600,7 +600,7 @@ m2a <-glmer(startle_binary~ Sex*relevel(factor(Treatment), ref = "GS") + (1|Batc
 
 ### Habituation
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 m3 <- lmer(log(distance +1) ~ Sex*Treatment*startle_number + (1|Batch) + (1|Individual_ID), data = data_startle_act_reduced)
 
 Anova(m3) #model used in manuscript
@@ -619,8 +619,9 @@ print(rept)
 
 ## Y-maze
 
-Wranging data into long form
+
 ```{r}
+#Wranging data into long form
 data_ymaze_reduced_long <- data_ymaze_reduced %>%
   pivot_longer(cols = c('LLL', 'LLR', 'LRL','LRR', 'RLL', 'RLR', 'RRL', 'RRR'), names_to = "Trigram", values_to = "Count")
 
@@ -632,7 +633,7 @@ data_ymaze_reduced_long_trigramtype <- data_ymaze_reduced_long %>% pivot_longer(
 
 ### Comparison of trigram type
 ```{r}
-#comparison of trigram type
+
 m4 <- glmer(Count_type~ Type + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced_long_trigramtype)
 Anova(m4)
 summary(m4)
@@ -640,7 +641,7 @@ summary(m4)
 
 ### Alternations
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 m5 <-glmer(alter~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced)
 Anova(m5)
 
@@ -657,7 +658,7 @@ print(rept)
 
 ### Repetitions
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 m6 <-glmer(reps~ Sex*Treatment + (1|Individual_ID) + (1|Batch), family = poisson, data = data_ymaze_reduced)
 Anova(m6)
 
@@ -837,12 +838,12 @@ g$startle_number<-as.factor(g$startle_number)
 plot2a <- na.omit(g) %>%
   filter(Sex == "M") %>%
   ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
-  geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
                 width = 1,
                 size = 1,
                 position = position_dodge(1)) +
   geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
-  ylim(-0.2, 2.5) + theme(text = element_text(size = 15), legend.position = "none") + labs(x = 'Treatment',
+  ylim(-0.5, 3) + theme(text = element_text(size = 15), legend.position = "none") + labs(x = 'Treatment',
                                                                                            y = 'log(arena distance +1)',
                                                                                            col = "Startle number",
                                                                                            title = "Males") +
@@ -858,12 +859,12 @@ plot2a <- na.omit(g) %>%
 plot2b <- na.omit(g) %>%
   filter(Sex == "F") %>%
   ggplot(aes(x = Treatment, y = mean, col = startle_number)) +
-  geom_errorbar(aes(ymin = mean - (sd / sqrt(2)), ymax = mean + (sd / sqrt(2))),
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
                 width = 1,
                 size = 1,
                 position = position_dodge(1)) +
   geom_point(position = position_dodge(1), aes(size = 2)) + theme_classic() +
-  ylim(-0.2, 2.5) +
+  ylim(-0.5, 3) +
   theme(text = element_text(size = 15)) + labs(x = 'Treatment',
                                                y = 'log(arena distance +1)',
                                                col = "Startle number",
